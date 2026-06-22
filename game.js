@@ -150,7 +150,10 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 980;
+    this.maxSpeed = 1040;
+    this.acceleration = 18000;
+    this.deceleration = 30000;
+    this.inputDirection = 0;
     this.shield = false;
     this.flamePhase = 0;
     this.bank = 0;
@@ -158,7 +161,11 @@ class Player {
 
   update(dt, input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    this.vx = direction * this.maxSpeed;
+    this.inputDirection = direction;
+    const targetVelocity = direction * this.maxSpeed;
+    const rate = direction === 0 ? this.deceleration : this.acceleration;
+    this.vx = this.moveToward(this.vx, targetVelocity, rate * dt);
+    if (Math.abs(this.vx) < 1) this.vx = 0;
     this.x += this.vx * dt;
 
     const minX = this.width / 2 + 8;
@@ -180,14 +187,22 @@ class Player {
 
   applyImmediateInput(input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    this.vx = direction * this.maxSpeed;
-    if (direction !== 0) {
-      this.x += direction * 18;
+    this.inputDirection = direction;
+    if (direction === 0) {
+      this.vx = 0;
+    } else if (Math.sign(this.vx) !== direction || Math.abs(this.vx) < this.maxSpeed * 0.72) {
+      this.vx = direction * this.maxSpeed * 0.72;
     }
 
     const minX = this.width / 2 + 8;
     const maxX = this.game.width - this.width / 2 - 8;
     this.x = Math.max(minX, Math.min(maxX, this.x));
+  }
+
+  moveToward(current, target, amount) {
+    if (current < target) return Math.min(current + amount, target);
+    if (current > target) return Math.max(current - amount, target);
+    return target;
   }
 
   draw(ctx) {
@@ -655,20 +670,30 @@ class Game {
       const button = document.getElementById(id);
       const press = (event) => {
         event.preventDefault();
+        if (event.pointerId !== undefined && button.setPointerCapture) {
+          button.setPointerCapture(event.pointerId);
+        }
         this.input.setTouch(dir, true);
       };
       const release = (event) => {
         event.preventDefault();
+        if (event.pointerId !== undefined && button.releasePointerCapture && button.hasPointerCapture?.(event.pointerId)) {
+          button.releasePointerCapture(event.pointerId);
+        }
         this.input.setTouch(dir, false);
       };
-      button.addEventListener("pointerdown", press);
-      button.addEventListener("pointerup", release);
-      button.addEventListener("pointercancel", release);
-      button.addEventListener("pointerleave", release);
-      button.addEventListener("touchstart", press, { passive: false });
-      button.addEventListener("touchend", release, { passive: false });
-      button.addEventListener("mousedown", press);
-      button.addEventListener("mouseup", release);
+      if (window.PointerEvent) {
+        button.addEventListener("pointerdown", press);
+        button.addEventListener("pointerup", release);
+        button.addEventListener("pointercancel", release);
+        button.addEventListener("lostpointercapture", release);
+      } else {
+        button.addEventListener("touchstart", press, { passive: false });
+        button.addEventListener("touchend", release, { passive: false });
+        button.addEventListener("mousedown", press);
+        button.addEventListener("mouseup", release);
+        button.addEventListener("mouseleave", release);
+      }
     });
 
     this.syncBest();
@@ -692,7 +717,6 @@ class Game {
   applyImmediateInput() {
     if (this.state !== "playing" || !this.player) return;
     this.player.applyImmediateInput(this.input);
-    this.draw();
   }
 
   createStars() {
