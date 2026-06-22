@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Dodge the Meteors</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="game-shell">
+    <canvas id="gameCanvas" aria-label="Dodge the Meteors game area"></canvas>
+
+    <section id="mainMenu" class="screen active">
+      <div class="menu-card">
+        <div class="arcade-badge">Premium Arcade</div>
+        <h1><span>Dodge</span><span>The</span><span>Meteors</span></h1>
+        <p class="tagline"><span>Survive the Storm &middot; 5 Sectors &middot;</span><span>Infinite Waves</span></p>
+        <div class="menu-actions">
+          <button id="playButton" class="primary-button">Launch</button>
+          <button id="instructionsButton" class="ghost-button">How to Play</button>
+        </div>
+        <div class="best-chip">Best Score <span id="menuBestScore">0</span></div>
+      </div>
+    </section>
+
+    <section id="hud" class="hud hidden" aria-live="polite">
+      <div class="hud-stack">
+        <div class="hud-row">
+          <div class="hud-pill score-pill"><span>Score</span><strong id="scoreText">0</strong></div>
+          <div class="hud-pill score-pill"><span>Best</span><strong id="bestText">0</strong></div>
+        </div>
+        <div class="hud-pill wide-pill"><span>Time</span><strong id="timeText">0:00</strong></div>
+        <div class="hud-pill wide-pill combo-pill"><span>Combo</span><strong id="comboText">x1</strong></div>
+      </div>
+      <div class="hud-center">
+        <div id="shieldStatus" class="status-chip off">Shield: Off</div>
+        <div id="slowStatus" class="status-chip off">Slow: Off</div>
+      </div>
+      <div class="hud-right">
+        <button id="pauseButton" class="icon-button" aria-label="Pause game">II Pause</button>
+        <div class="sector-chip"><span></span> Sector <strong id="sectorText">Deep Blue Space</strong></div>
+      </div>
+    </section>
+
+    <section id="pauseMenu" class="screen modal-screen hidden">
+      <div class="panel">
+        <h2>Paused</h2>
+        <p>Take a breath. The meteor field will wait.</p>
+        <button id="resumeButton" class="primary-button">Resume</button>
+        <button id="restartPauseButton" class="ghost-button">Restart</button>
+        <button id="mainFromPauseButton" class="ghost-button">Main Menu</button>
+      </div>
+    </section>
+
+    <section id="gameOverScreen" class="screen modal-screen hidden">
+      <div class="panel">
+        <h2>Game Over</h2>
+        <div class="results-grid">
+          <div><span>Final Score</span><strong id="finalScore">0</strong></div>
+          <div><span>Best Score</span><strong id="finalBest">0</strong></div>
+          <div><span>Survival Time</span><strong id="survivalTime">0s</strong></div>
+        </div>
+        <button id="playAgainButton" class="primary-button">Play Again</button>
+        <button id="mainFromGameOverButton" class="ghost-button">Main Menu</button>
+      </div>
+    </section>
+
+    <section id="instructionsModal" class="screen modal-screen hidden">
+      <div class="panel instructions-panel">
+        <h2>How to Play</h2>
+        <ul>
+          <li>Move with <strong>A/D</strong> or <strong>Arrow Keys</strong>.</li>
+          <li>Avoid falling meteors and survive as long as possible.</li>
+          <li>Pass close to meteors for <strong>Near Miss +10</strong>.</li>
+          <li>Collect blue shields to absorb one hit.</li>
+          <li>Collect purple orbs to slow meteors for 5 seconds.</li>
+        </ul>
+        <button id="closeInstructionsButton" class="primary-button">Got It</button>
+      </div>
+    </section>
+
+    <button id="muteButton" class="mute-button" aria-label="Mute audio">Sound On</button>
+
+    <div id="mobileControls" class="mobile-controls" aria-label="Mobile movement controls">
+      <button id="leftButton" aria-label="Move left">Left</button>
+      <button id="rightButton" aria-label="Move right">Right</button>
+    </div>
+  </main>
+
+  <script src="game.js"></script>
+</body>
+</html>
