@@ -145,14 +145,14 @@ class AudioSystem {
 class Player {
   constructor(game) {
     this.game = game;
-    this.width = 52;
-    this.height = 70;
+    this.width = 42;
+    this.height = 56;
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 1040;
-    this.acceleration = 18000;
-    this.deceleration = 30000;
+    this.maxSpeed = 1520;
+    this.acceleration = 34000;
+    this.deceleration = 54000;
     this.inputDirection = 0;
     this.shield = false;
     this.flamePhase = 0;
@@ -209,6 +209,7 @@ class Player {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.bank);
+    ctx.scale(0.82, 0.82);
 
     if (this.shield) {
       const pulse = 1 + Math.sin(performance.now() / 130) * 0.04;
@@ -308,7 +309,7 @@ class Player {
   }
 
   collisionCircle() {
-    return { x: this.x, y: this.y, r: 25 };
+    return { x: this.x, y: this.y, r: 20 };
   }
 }
 
@@ -323,6 +324,8 @@ class Meteor {
     this.vy = d.meteorSpeed * (0.78 + Math.random() * 0.55);
     this.rotation = Math.random() * Math.PI * 2;
     this.spin = (Math.random() - 0.5) * 3.5;
+    this.flamePhase = Math.random() * Math.PI * 2;
+    this.visualTilt = -0.16 + (Math.random() - 0.5) * 0.14;
     this.nearMissAwarded = false;
     this.hasTrail = Math.random() < 0.58;
     this.points = Array.from({ length: 13 }, (_, i) => {
@@ -346,11 +349,19 @@ class Meteor {
     this.x += this.vx * slowFactor * dt;
     this.y += this.vy * slowFactor * dt;
     this.rotation += this.spin * dt;
+    this.flamePhase += dt * (9 + this.vy / 80);
   }
 
   draw(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
+    ctx.rotate(this.visualTilt + Math.sin(this.flamePhase * 0.45) * 0.035);
+
+    if (this.game.meteorImageReady) {
+      this.drawImageMeteor(ctx);
+      ctx.restore();
+      return;
+    }
 
     if (this.hasTrail) {
       ctx.save();
@@ -439,6 +450,83 @@ class Meteor {
     ctx.restore();
   }
 
+  drawImageMeteor(ctx) {
+    const image = this.game.meteorImage;
+    const scale = (this.radius * 2.2) / 108;
+    const rockCenterX = 70;
+    const rockCenterY = 118;
+    const drawWidth = image.width * scale;
+    const drawHeight = image.height * scale;
+    const drawX = -rockCenterX * scale;
+    const drawY = -rockCenterY * scale;
+    const pulse = 0.88 + Math.sin(this.flamePhase) * 0.12;
+    const tailLength = this.radius * (2.7 + pulse * 0.45);
+
+    if (this.hasTrail) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = 0; i < 3; i += 1) {
+        const wave = Math.sin(this.flamePhase * (1.15 + i * 0.22) + i * 1.7);
+        const offset = (i - 1) * this.radius * 0.18;
+        const gradient = ctx.createLinearGradient(this.radius * 0.1, -this.radius * 0.75, this.radius * 1.95, -tailLength);
+        gradient.addColorStop(0, `rgba(255, 245, 170, ${0.32 + pulse * 0.16})`);
+        gradient.addColorStop(0.36, `rgba(255, 135, 24, ${0.2 + pulse * 0.14})`);
+        gradient.addColorStop(1, "rgba(255, 48, 40, 0)");
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.moveTo(this.radius * 0.2 + offset, -this.radius * 0.78);
+        ctx.quadraticCurveTo(
+          this.radius * (0.92 + wave * 0.16),
+          -this.radius * (1.55 + i * 0.18),
+          this.radius * (1.55 + wave * 0.28),
+          -tailLength
+        );
+        ctx.quadraticCurveTo(
+          this.radius * (1.08 - wave * 0.12),
+          -this.radius * (1.72 + i * 0.16),
+          this.radius * -0.18 + offset * 0.5,
+          -this.radius * 0.36
+        );
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = "#ff7a1f";
+    ctx.shadowBlur = 22 + pulse * 14;
+    const aura = ctx.createRadialGradient(0, 0, this.radius * 0.4, 0, 0, this.radius * 2.5);
+    aura.addColorStop(0, "rgba(255, 151, 39, 0.2)");
+    aura.addColorStop(0.45, "rgba(255, 92, 31, 0.12)");
+    aura.addColorStop(1, "rgba(255, 77, 93, 0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.shadowColor = "rgba(255, 120, 34, 0.8)";
+    ctx.shadowBlur = 12 + pulse * 8;
+    ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    for (let i = 0; i < 5; i += 1) {
+      const sparkPhase = this.flamePhase * (1.4 + i * 0.17) + i * 2.1;
+      const sparkX = this.radius * (0.45 + Math.sin(sparkPhase) * 0.85);
+      const sparkY = -this.radius * (1.3 + ((sparkPhase * 0.23) % 1) * 1.8);
+      ctx.fillStyle = `rgba(255, ${155 + i * 14}, 58, ${0.52 - i * 0.06})`;
+      ctx.beginPath();
+      ctx.arc(sparkX, sparkY, Math.max(1.3, this.radius * (0.045 + i * 0.006)), 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
   isOffscreen() {
     return this.y - this.radius > this.game.height + 40;
   }
@@ -464,6 +552,12 @@ class PowerUp {
     const color = this.type === "shield" ? "#31d7ff" : "#a855f7";
     ctx.save();
     ctx.translate(this.x, this.y);
+    if (this.game.powerUpImageReady) {
+      this.drawImagePowerUp(ctx, color);
+      ctx.restore();
+      return;
+    }
+
     ctx.shadowColor = color;
     ctx.shadowBlur = 24;
     const pulse = 1 + Math.sin(this.phase) * 0.08;
@@ -477,6 +571,57 @@ class PowerUp {
     ctx.fill();
     ctx.strokeStyle = "rgba(255,255,255,0.65)";
     ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawImagePowerUp(ctx, color) {
+    const image = this.game.powerUpImage;
+    const pulse = 1 + Math.sin(this.phase) * 0.08;
+    const spin = this.phase * 0.16;
+    const source = this.type === "shield"
+      ? { x: 22, y: 8, size: 190 }
+      : { x: 289, y: 8, size: 190 };
+    const drawSize = this.radius * 3.15 * pulse;
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 24;
+    const halo = ctx.createRadialGradient(0, 0, this.radius * 0.4, 0, 0, this.radius * 2.2);
+    halo.addColorStop(0, `${color}66`);
+    halo.addColorStop(0.58, `${color}24`);
+    halo.addColorStop(1, "rgba(255,255,255,0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 2.15 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.rotate(spin);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 18;
+    ctx.drawImage(
+      image,
+      source.x,
+      source.y,
+      source.size,
+      source.size,
+      -drawSize / 2,
+      -drawSize / 2,
+      drawSize,
+      drawSize
+    );
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = `${color}cc`;
+    ctx.lineWidth = 1.5;
+    ctx.rotate(-spin * 1.8);
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 1.92 * pulse, 0.35, Math.PI * 1.45);
     ctx.stroke();
     ctx.restore();
   }
@@ -612,6 +757,18 @@ class Game {
     this.battleBackground.onload = () => this.renderBackgroundLayer();
     this.battleBackground.src = "battle-background.png";
     this.battleBackgroundReady = false;
+    this.meteorImage = new Image();
+    this.meteorImageReady = false;
+    this.meteorImage.onload = () => {
+      this.meteorImageReady = true;
+    };
+    this.meteorImage.src = "meteriot.png";
+    this.powerUpImage = new Image();
+    this.powerUpImageReady = false;
+    this.powerUpImage.onload = () => {
+      this.powerUpImageReady = true;
+    };
+    this.powerUpImage.src = "sheild and slow time.png";
     this.engineParticlePool = [];
     this.combo = 1;
     this.comboTimer = 0;
@@ -677,7 +834,7 @@ class Game {
       };
       const release = (event) => {
         event.preventDefault();
-        if (event.pointerId !== undefined && button.releasePointerCapture && button.hasPointerCapture?.(event.pointerId)) {
+        if (event.pointerId !== undefined && button.releasePointerCapture && button.hasPointerCapture && button.hasPointerCapture(event.pointerId)) {
           button.releasePointerCapture(event.pointerId);
         }
         this.input.setTouch(dir, false);
@@ -686,7 +843,6 @@ class Game {
         button.addEventListener("pointerdown", press);
         button.addEventListener("pointerup", release);
         button.addEventListener("pointercancel", release);
-        button.addEventListener("lostpointercapture", release);
       } else {
         button.addEventListener("touchstart", press, { passive: false });
         button.addEventListener("touchend", release, { passive: false });
@@ -717,6 +873,7 @@ class Game {
   applyImmediateInput() {
     if (this.state !== "playing" || !this.player) return;
     this.player.applyImmediateInput(this.input);
+    this.draw();
   }
 
   createStars() {
