@@ -1109,10 +1109,14 @@ class Game {
     this.ui.time.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     this.ui.combo.textContent = `x${this.combo}`;
     this.ui.sector.textContent = this.sectorName();
-    this.ui.shield.textContent = this.player.shield ? "Shield: Ready" : "Shield: Off";
-    this.ui.shield.className = `status-chip ${this.player.shield ? "on" : "off"}`;
-    this.ui.slow.textContent = this.slowTimer > 0 ? `Slow: ${this.slowTimer.toFixed(1)}s` : "Slow: Off";
-    this.ui.slow.className = `status-chip ${this.slowTimer > 0 ? "slow" : "off"}`;
+    if (this.ui.shield) {
+      this.ui.shield.textContent = this.player.shield ? "Shield: Ready" : "Shield: Off";
+      this.ui.shield.className = `status-chip ${this.player.shield ? "on" : "off"}`;
+    }
+    if (this.ui.slow) {
+      this.ui.slow.textContent = this.slowTimer > 0 ? `Slow: ${this.slowTimer.toFixed(1)}s` : "Slow: Off";
+      this.ui.slow.className = `status-chip ${this.slowTimer > 0 ? "slow" : "off"}`;
+    }
   }
 
   sectorName() {
