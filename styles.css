@@ -306,7 +306,7 @@ button:active {
   inset: 22px 14px auto 14px;
   z-index: 5;
   display: grid;
-  grid-template-columns: 238px minmax(240px, 1fr);
+  grid-template-columns: 212px minmax(230px, 1fr);
   align-items: start;
   gap: 12px;
   pointer-events: none;
@@ -327,15 +327,15 @@ button:active {
 .hud-stack {
   align-items: flex-start;
   flex-direction: column;
-  gap: 12px;
+  gap: 9px;
 }
 
 .hud-row {
   width: 100%;
-  min-height: 86px;
-  padding: 14px 18px;
+  min-height: 70px;
+  padding: 10px 14px;
   border: 1px solid rgba(25, 231, 255, 0.68);
-  border-radius: 20px;
+  border-radius: 18px;
   background:
     linear-gradient(180deg, rgba(15, 35, 70, 0.76), rgba(2, 8, 24, 0.82)),
     linear-gradient(90deg, rgba(255, 255, 255, 0.06), transparent);
@@ -357,8 +357,8 @@ button:active {
 
 .hud-pill,
 .status-chip {
-  padding: 13px 18px;
-  min-width: 92px;
+  padding: 10px 14px;
+  min-width: 78px;
   background:
     linear-gradient(180deg, rgba(9, 26, 58, 0.72), rgba(2, 8, 24, 0.74)),
     linear-gradient(90deg, rgba(255, 255, 255, 0.05), transparent);
@@ -366,7 +366,7 @@ button:active {
 }
 
 .score-pill {
-  min-width: 88px;
+  min-width: 76px;
   padding: 0;
   border: 0;
   background: transparent;
@@ -375,13 +375,13 @@ button:active {
 
 .wide-pill {
   display: flex;
-  width: 238px;
-  min-height: 50px;
+  width: 212px;
+  min-height: 42px;
   align-items: center;
   justify-content: flex-start;
-  gap: 14px;
+  gap: 11px;
   border-color: rgba(25, 231, 255, 0.68);
-  border-radius: 20px;
+  border-radius: 18px;
 }
 
 .combo-pill {
@@ -390,8 +390,8 @@ button:active {
 
 .combo-pill::before {
   content: "";
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
   background: var(--pink);
   box-shadow: 0 0 14px rgba(242, 92, 255, 0.88);
@@ -405,10 +405,10 @@ button:active {
 .results-grid span {
   display: block;
   color: var(--muted);
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 900;
   text-transform: uppercase;
-  letter-spacing: 0.2em;
+  letter-spacing: 0.17em;
 }
 
 .hud-pill strong,
@@ -416,7 +416,7 @@ button:active {
   display: block;
   color: var(--text);
   font-family: "Trebuchet MS", "Segoe UI", system-ui, sans-serif;
-  font-size: 1.38rem;
+  font-size: 1.22rem;
   font-weight: 900;
   line-height: 1.05;
   text-shadow: 0 0 14px rgba(25, 231, 255, 0.5);
@@ -424,7 +424,7 @@ button:active {
 
 .score-pill strong {
   color: var(--cyan);
-  font-size: 1.82rem;
+  font-size: 1.52rem;
   text-shadow: 0 0 13px rgba(25, 231, 255, 0.9);
 }
 
@@ -564,43 +564,43 @@ button:active {
   }
 
   .hud-row {
-    width: 204px;
-    min-height: 64px;
-    padding: 9px 12px;
+    width: 184px;
+    min-height: 56px;
+    padding: 7px 10px;
     border-radius: 16px;
   }
 
   .hud-pill,
   .status-chip {
-    min-width: 76px;
+    min-width: 66px;
     padding: 7px 9px;
     font-size: 0.78rem;
   }
 
   .score-pill {
-    min-width: 76px;
+    min-width: 66px;
     padding: 0;
   }
 
   .wide-pill {
-    width: 204px;
-    min-height: 42px;
-    gap: 10px;
+    width: 184px;
+    min-height: 36px;
+    gap: 8px;
   }
 
   .hud-pill strong,
   .results-grid strong {
-    font-size: 1rem;
+    font-size: 0.92rem;
   }
 
   .score-pill strong {
-    font-size: 1.38rem;
+    font-size: 1.2rem;
   }
 
   .hud-pill span,
   .results-grid span {
-    font-size: 0.68rem;
-    letter-spacing: 0.16em;
+    font-size: 0.62rem;
+    letter-spacing: 0.13em;
   }
 
   .hud-center {

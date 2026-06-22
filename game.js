@@ -150,7 +150,7 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 1420;
+    this.maxSpeed = 1180;
     this.inputDirection = 0;
     this.shield = false;
     this.flamePhase = 0;
