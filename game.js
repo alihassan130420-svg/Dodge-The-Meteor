@@ -421,6 +421,12 @@ class Meteor {
   }
 
   withAlpha(color, alpha) {
+    if (color.startsWith("#") && color.length === 7) {
+      const r = parseInt(color.slice(1, 3), 16);
+      const g = parseInt(color.slice(3, 5), 16);
+      const b = parseInt(color.slice(5, 7), 16);
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    }
     return color.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, `rgba($1, $2, $3, ${alpha})`);
   }
 
@@ -681,81 +687,146 @@ class PowerUp {
   }
 
   draw(ctx) {
-    const color = this.type === "shield" ? "#31d7ff" : "#a855f7";
+    const palette = this.type === "shield"
+      ? {
+        core: "#31d7ff",
+        edge: "#0ea5e9",
+        dark: "#06224f",
+        accent: "#f8fbff",
+        aura: "rgba(49, 215, 255, 0.34)",
+      }
+      : {
+        core: "#d85cff",
+        edge: "#7c3aed",
+        dark: "#211044",
+        accent: "#f8fbff",
+        aura: "rgba(216, 92, 255, 0.32)",
+      };
+
     ctx.save();
     ctx.translate(this.x, this.y);
-    if (this.game.powerUpImageReady) {
-      this.drawImagePowerUp(ctx, color);
-      ctx.restore();
-      return;
-    }
-
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 24;
     const pulse = 1 + Math.sin(this.phase) * 0.08;
-    const g = ctx.createRadialGradient(0, 0, 2, 0, 0, this.radius * pulse);
-    g.addColorStop(0, "#ffffff");
-    g.addColorStop(0.32, color);
-    g.addColorStop(1, "rgba(255,255,255,0.02)");
-    ctx.fillStyle = g;
+    const spin = this.phase * (this.type === "shield" ? 0.7 : -0.9);
+
+    this.drawPowerAura(ctx, palette, pulse);
+    this.drawPowerCore(ctx, palette, pulse);
+    if (this.type === "shield") {
+      this.drawShieldIcon(ctx, palette, spin);
+    } else {
+      this.drawSlowIcon(ctx, palette, spin);
+    }
+    ctx.restore();
+  }
+
+  drawPowerAura(ctx, palette, pulse) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const halo = ctx.createRadialGradient(0, 0, this.radius * 0.3, 0, 0, this.radius * 2.55 * pulse);
+    halo.addColorStop(0, palette.aura);
+    halo.addColorStop(0.48, this.withAlpha(palette.aura, 0.16));
+    halo.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = halo;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 2.55 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  drawPowerCore(ctx, palette, pulse) {
+    ctx.save();
+    ctx.shadowColor = palette.core;
+    ctx.shadowBlur = 18;
+    const core = ctx.createRadialGradient(-this.radius * 0.34, -this.radius * 0.42, 1, 0, 0, this.radius * 1.18 * pulse);
+    core.addColorStop(0, palette.accent);
+    core.addColorStop(0.2, palette.core);
+    core.addColorStop(0.6, palette.edge);
+    core.addColorStop(1, palette.dark);
+    ctx.fillStyle = core;
     ctx.beginPath();
     ctx.arc(0, 0, this.radius * pulse, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = "rgba(255,255,255,0.65)";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = this.withAlpha(palette.accent, 0.72);
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = this.withAlpha(palette.core, 0.8);
+    ctx.lineWidth = 1.4;
+    ctx.rotate(this.phase * 0.85);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, this.radius * 1.44 * pulse, this.radius * 0.56 * pulse, 0, 0.2, Math.PI * 1.45);
     ctx.stroke();
     ctx.restore();
   }
 
-  drawImagePowerUp(ctx, color) {
-    const image = this.game.powerUpImage;
-    const pulse = 1 + Math.sin(this.phase) * 0.08;
-    const spin = this.phase * 0.16;
-    const source = this.type === "shield"
-      ? { x: 22, y: 8, size: 190 }
-      : { x: 289, y: 8, size: 190 };
-    const drawSize = this.radius * 3.15 * pulse;
-
+  drawShieldIcon(ctx, palette, spin) {
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 24;
-    const halo = ctx.createRadialGradient(0, 0, this.radius * 0.4, 0, 0, this.radius * 2.2);
-    halo.addColorStop(0, `${color}66`);
-    halo.addColorStop(0.58, `${color}24`);
-    halo.addColorStop(1, "rgba(255,255,255,0)");
-    ctx.fillStyle = halo;
+    ctx.rotate(spin * 0.12);
+    ctx.shadowColor = palette.core;
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = "rgba(2, 8, 24, 0.56)";
+    ctx.strokeStyle = this.withAlpha(palette.accent, 0.86);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, this.radius * 2.15 * pulse, 0, Math.PI * 2);
+    ctx.moveTo(0, -this.radius * 0.72);
+    ctx.lineTo(this.radius * 0.52, -this.radius * 0.36);
+    ctx.lineTo(this.radius * 0.42, this.radius * 0.36);
+    ctx.lineTo(0, this.radius * 0.72);
+    ctx.lineTo(-this.radius * 0.42, this.radius * 0.36);
+    ctx.lineTo(-this.radius * 0.52, -this.radius * 0.36);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = this.withAlpha(palette.core, 0.82);
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    ctx.moveTo(-this.radius * 0.26, -this.radius * 0.02);
+    ctx.lineTo(-this.radius * 0.05, this.radius * 0.22);
+    ctx.lineTo(this.radius * 0.34, -this.radius * 0.28);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawSlowIcon(ctx, palette, spin) {
+    ctx.save();
+    ctx.rotate(spin);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.strokeStyle = this.withAlpha(palette.accent, 0.8);
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 0.62, -0.35, Math.PI * 1.55);
+    ctx.stroke();
+
+    ctx.fillStyle = palette.accent;
+    ctx.beginPath();
+    ctx.arc(Math.cos(-0.35) * this.radius * 0.62, Math.sin(-0.35) * this.radius * 0.62, 2.3, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
 
     ctx.save();
-    ctx.rotate(spin);
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 18;
-    ctx.drawImage(
-      image,
-      source.x,
-      source.y,
-      source.size,
-      source.size,
-      -drawSize / 2,
-      -drawSize / 2,
-      drawSize,
-      drawSize
-    );
-    ctx.restore();
-
-    ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.strokeStyle = `${color}cc`;
-    ctx.lineWidth = 1.5;
-    ctx.rotate(-spin * 1.8);
+    ctx.shadowColor = palette.core;
+    ctx.shadowBlur = 8;
+    ctx.strokeStyle = this.withAlpha(palette.accent, 0.9);
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.arc(0, 0, this.radius * 1.92 * pulse, 0.35, Math.PI * 1.45);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(0, -this.radius * 0.48);
+    ctx.moveTo(0, 0);
+    ctx.lineTo(this.radius * 0.4, this.radius * 0.2);
     ctx.stroke();
+    ctx.fillStyle = palette.accent;
+    ctx.beginPath();
+    ctx.arc(0, 0, 3, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
+  }
+
+  withAlpha(color, alpha) {
+    return color.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, `rgba($1, $2, $3, ${alpha})`);
   }
 
   isOffscreen() {
@@ -888,12 +959,6 @@ class Game {
     this.battleBackground.onload = () => this.renderBackgroundLayer();
     this.battleBackground.src = "battle-background.png";
     this.battleBackgroundReady = false;
-    this.powerUpImage = new Image();
-    this.powerUpImageReady = false;
-    this.powerUpImage.onload = () => {
-      this.powerUpImageReady = true;
-    };
-    this.powerUpImage.src = "sheild and slow time.png";
     this.engineParticlePool = [];
     this.meteorPool = [];
     this.combo = 1;
