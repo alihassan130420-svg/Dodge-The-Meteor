@@ -327,9 +327,10 @@ class DifficultyManager {
   }
 
   applyMinuteDiagonalStorm(time, target) {
-    if (time < 60 || time % 60 >= 10) return target;
+    const shiftedTime = time - 30;
+    if (shiftedTime < 0 || shiftedTime % 60 >= 10) return target;
 
-    const minute = Math.floor(time / 60);
+    const minute = Math.floor(shiftedTime / 60) + 1;
     const stormTarget = this.cloneSettings(target);
     stormTarget.phaseName = `Diagonal Storm ${minute}`;
     stormTarget.forceDiagonalOnly = true;

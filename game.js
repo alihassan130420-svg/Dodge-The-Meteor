@@ -51,6 +51,7 @@ class AudioSystem {
     this.musicGain = null;
     this.muted = localStorage.getItem("dtm_muted") === "true";
     this.musicTimer = null;
+    this.musicStep = 0;
   }
 
   ensure() {
@@ -62,7 +63,7 @@ class AudioSystem {
     this.master.gain.value = this.muted ? 0 : 0.24;
     this.master.connect(this.context.destination);
     this.musicGain = this.context.createGain();
-    this.musicGain.gain.value = 0.12;
+    this.musicGain.gain.value = 0.18;
     this.musicGain.connect(this.master);
   }
 
@@ -116,29 +117,98 @@ class AudioSystem {
   startMusic() {
     this.ensure();
     if (!this.context || this.musicTimer) return;
-    const notes = [196, 247, 294, 370, 294, 247];
-    let step = 0;
+    if (this.context.state === "suspended") this.context.resume();
+
+    const bass = [82.41, 82.41, 110, 98, 73.42, 73.42, 98, 110];
+    const lead = [329.63, null, 392, null, 493.88, null, 440, null, 392, null, 329.63, null, 293.66, null, 329.63, null];
+    const pad = [164.81, 196, 246.94, 329.63];
     this.musicTimer = setInterval(() => {
       if (!this.context || this.muted) return;
       const now = this.context.currentTime;
-      const osc = this.context.createOscillator();
-      const gain = this.context.createGain();
-      osc.type = "sine";
-      osc.frequency.value = notes[step % notes.length];
-      gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.08, now + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.45);
-      osc.connect(gain);
-      gain.connect(this.musicGain);
-      osc.start(now);
-      osc.stop(now + 0.5);
-      step += 1;
-    }, 520);
+      const step = this.musicStep % 16;
+
+      if (step % 4 === 0) {
+        this.musicNote(bass[(this.musicStep / 4) % bass.length], now, 0.48, "triangle", 0.1, 360);
+        this.kick(now);
+      }
+
+      if (step % 8 === 0) {
+        const root = pad[(this.musicStep / 8) % pad.length];
+        this.musicNote(root, now, 1.6, "sine", 0.025, 900);
+        this.musicNote(root * 1.5, now + 0.03, 1.45, "sine", 0.018, 1200);
+        this.musicNote(root * 2, now + 0.06, 1.35, "triangle", 0.014, 1500);
+      }
+
+      if (lead[step]) {
+        this.musicNote(lead[step], now + 0.02, 0.22, "square", 0.035, 1800);
+      }
+
+      if (step % 2 === 1) this.hat(now);
+      this.musicStep += 1;
+    }, 260);
   }
 
   stopMusic() {
     clearInterval(this.musicTimer);
     this.musicTimer = null;
+    this.musicStep = 0;
+  }
+
+  musicNote(freq, start, duration, type, volume, filterFreq) {
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, start);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(filterFreq, start);
+    filter.Q.value = 0.8;
+
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(volume, start + 0.035);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicGain);
+    osc.start(start);
+    osc.stop(start + duration + 0.05);
+  }
+
+  kick(start) {
+    const osc = this.context.createOscillator();
+    const gain = this.context.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(92, start);
+    osc.frequency.exponentialRampToValueAtTime(42, start + 0.16);
+    gain.gain.setValueAtTime(0.12, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
+    osc.connect(gain);
+    gain.connect(this.musicGain);
+    osc.start(start);
+    osc.stop(start + 0.2);
+  }
+
+  hat(start) {
+    const bufferSize = Math.floor(this.context.sampleRate * 0.045);
+    const buffer = this.context.createBuffer(1, bufferSize, this.context.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i += 1) data[i] = Math.random() * 2 - 1;
+
+    const noise = this.context.createBufferSource();
+    const filter = this.context.createBiquadFilter();
+    const gain = this.context.createGain();
+    noise.buffer = buffer;
+    filter.type = "highpass";
+    filter.frequency.setValueAtTime(5200, start);
+    gain.gain.setValueAtTime(0.025, start);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.045);
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.musicGain);
+    noise.start(start);
+    noise.stop(start + 0.05);
   }
 }
 
@@ -1319,11 +1389,32 @@ class Game {
     this.state = "menu";
     this.root.classList.remove("is-playing");
     this.audio.stopMusic();
+    this.clearGameplayScene();
     this.hideAllScreens();
     this.ui.mainMenu.classList.remove("hidden");
     this.ui.mainMenu.classList.add("active");
     this.ui.hud.classList.add("hidden");
     this.syncBest();
+  }
+
+  clearGameplayScene() {
+    if (this.meteors) {
+      this.meteors.forEach((meteor) => this.recycleMeteor(meteor));
+      this.meteors = [];
+    }
+    this.powerUps = [];
+    this.particles = [];
+    if (this.engineParticles) {
+      this.engineParticles.forEach((particle) => {
+        if (this.engineParticlePool.length < 80) this.engineParticlePool.push(particle);
+      });
+      this.engineParticles = [];
+    }
+    this.texts = [];
+    this.shake = 0;
+    this.slowTimer = 0;
+    this.input.pausePressed = false;
+    if (this.player) this.player.shield = false;
   }
 
   showInstructions() {
@@ -1576,6 +1667,11 @@ class Game {
     }
 
     this.drawBackground(ctx);
+    if (this.state === "menu") {
+      ctx.restore();
+      return;
+    }
+
     this.powerUps.forEach((p) => p.draw(ctx));
     this.meteors.forEach((m) => m.draw(ctx));
     this.engineParticles.forEach((p) => p.draw(ctx));
