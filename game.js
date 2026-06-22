@@ -150,9 +150,7 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 1360;
-    this.acceleration = 90000;
-    this.deceleration = 90000;
+    this.maxSpeed = 1420;
     this.inputDirection = 0;
     this.shield = false;
     this.flamePhase = 0;
@@ -162,10 +160,7 @@ class Player {
   update(dt, input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     this.inputDirection = direction;
-    const targetVelocity = direction * this.maxSpeed;
-    const rate = direction === 0 ? this.deceleration : this.acceleration;
-    this.vx = this.moveToward(this.vx, targetVelocity, rate * dt);
-    if (Math.abs(this.vx) < 1) this.vx = 0;
+    this.vx = direction * this.maxSpeed;
     this.x += this.vx * dt;
 
     const minX = this.width / 2 + 8;
@@ -187,22 +182,16 @@ class Player {
 
   applyImmediateInput(input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    const previousDirection = this.inputDirection;
     this.inputDirection = direction;
-    if (direction === 0) {
-      this.vx = 0;
-    } else {
-      this.vx = direction * this.maxSpeed;
-    }
+    this.vx = direction * this.maxSpeed;
 
     const minX = this.width / 2 + 8;
     const maxX = this.game.width - this.width / 2 - 8;
+    if (direction !== 0 && direction !== previousDirection) {
+      this.x += direction * Math.min(18, this.maxSpeed / 90);
+    }
     this.x = Math.max(minX, Math.min(maxX, this.x));
-  }
-
-  moveToward(current, target, amount) {
-    if (current < target) return Math.min(current + amount, target);
-    if (current > target) return Math.max(current - amount, target);
-    return target;
   }
 
   draw(ctx) {
@@ -330,11 +319,12 @@ class Meteor {
     this.hasTrail = Math.random() < 0.58;
     this.tailLength = this.radius * (2.35 + Math.random() * 1.15);
     this.tailLean = (Math.random() - 0.5) * this.radius * 0.75 - this.vx * 0.06;
-    this.points = Array.from({ length: 13 }, (_, i) => {
-      const a = (i / 13) * Math.PI * 2;
+    const pointCount = 10;
+    this.points = Array.from({ length: pointCount }, (_, i) => {
+      const a = (i / pointCount) * Math.PI * 2;
       return { a, r: this.radius * (0.72 + Math.random() * 0.38) };
     });
-    this.lavaVeins = Array.from({ length: 5 + Math.floor(Math.random() * 4) }, () => {
+    this.lavaVeins = Array.from({ length: 3 + Math.floor(Math.random() * 3) }, () => {
       const a = Math.random() * Math.PI * 2;
       const bend = (Math.random() - 0.5) * 0.95;
       const start = this.radius * (0.06 + Math.random() * 0.18);
@@ -351,12 +341,13 @@ class Meteor {
         ],
       };
     });
-    this.craters = Array.from({ length: 4 + Math.floor(Math.random() * 4) }, () => ({
+    this.craters = Array.from({ length: 3 + Math.floor(Math.random() * 3) }, () => ({
       a: Math.random() * Math.PI * 2,
       d: this.radius * (0.12 + Math.random() * 0.48),
       r: this.radius * (0.08 + Math.random() * 0.13),
       shade: Math.random(),
     }));
+    this.rockSprite = this.buildRockSprite();
   }
 
   update(dt, slowFactor) {
@@ -370,16 +361,27 @@ class Meteor {
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.visualTilt + Math.sin(this.flamePhase * 0.45) * 0.035);
-
-    this.drawFlameTrail(ctx);
-
+    this.drawFastTrail(ctx);
     ctx.rotate(this.rotation);
+    ctx.drawImage(this.rockSprite.canvas, -this.rockSprite.center, -this.rockSprite.center);
+    ctx.restore();
+  }
+
+  buildRockSprite() {
+    const size = Math.ceil(this.radius * 5.15);
+    const center = size / 2;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    ctx.imageSmoothingEnabled = true;
+    ctx.translate(center, center);
     this.drawHeatAura(ctx);
     this.drawRockBody(ctx);
     this.drawLavaVeins(ctx);
     this.drawCraters(ctx);
     this.drawRockHighlights(ctx);
-    ctx.restore();
+    return { canvas, center };
   }
 
   traceRock(ctx, scale = 1) {
@@ -393,7 +395,7 @@ class Meteor {
     ctx.closePath();
   }
 
-  drawFlameTrail(ctx) {
+  drawFastTrail(ctx) {
     if (!this.hasTrail) return;
 
     const r = this.radius;
@@ -403,42 +405,46 @@ class Meteor {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    this.paintFlameLayer(ctx, r, length, lean, 1.16, 22, "rgba(255, 47, 22, 0)", "rgba(255, 86, 24, 0.34)", "rgba(255, 202, 89, 0.48)");
-    this.paintFlameLayer(ctx, r, length * 0.82, lean * 0.72, 0.78, 15, "rgba(255, 70, 18, 0)", "rgba(255, 138, 24, 0.46)", "rgba(255, 238, 142, 0.6)");
-    this.paintFlameLayer(ctx, r, length * 0.58, lean * 0.44, 0.42, 10, "rgba(255, 128, 18, 0)", "rgba(255, 219, 93, 0.64)", "rgba(255, 255, 221, 0.74)");
-    ctx.restore();
-  }
-
-  paintFlameLayer(ctx, r, length, lean, width, blur, tipColor, midColor, baseColor) {
-    const wobble = Math.sin(this.flamePhase * 1.8 + width * 3) * r * 0.16;
     const gradient = ctx.createLinearGradient(0, -r * 0.3, lean, -length);
-    gradient.addColorStop(0, baseColor);
-    gradient.addColorStop(0.48, midColor);
-    gradient.addColorStop(1, tipColor);
+    gradient.addColorStop(0, "rgba(255, 245, 160, 0.58)");
+    gradient.addColorStop(0.34, "rgba(255, 117, 22, 0.38)");
+    gradient.addColorStop(0.72, "rgba(255, 50, 28, 0.16)");
+    gradient.addColorStop(1, "rgba(255, 47, 22, 0)");
     ctx.fillStyle = gradient;
-    ctx.shadowColor = midColor;
-    ctx.shadowBlur = blur;
     ctx.beginPath();
-    ctx.moveTo(-r * 0.72 * width, -r * 0.2);
+    ctx.moveTo(-r * 0.72, -r * 0.34);
     ctx.bezierCurveTo(
-      -r * 0.34 * width + wobble,
+      -r * 0.32,
       -r * 0.98,
-      lean - r * 0.44 * width,
+      lean - r * 0.42,
       -length * 0.58,
-      lean + wobble * 0.5,
+      lean,
       -length
     );
     ctx.bezierCurveTo(
-      lean + r * 0.5 * width,
+      lean + r * 0.46,
       -length * 0.62,
-      r * 0.9 * width - wobble * 0.3,
+      r * 0.74,
       -r * 1.02,
-      r * 0.48 * width,
-      -r * 0.18
+      r * 0.68,
+      -r * 0.32
     );
-    ctx.quadraticCurveTo(0, -r * 0.55, -r * 0.72 * width, -r * 0.2);
+    ctx.quadraticCurveTo(0, -r * 0.62, -r * 0.72, -r * 0.34);
     ctx.closePath();
     ctx.fill();
+
+    const inner = ctx.createLinearGradient(0, -r * 0.35, lean * 0.65, -length * 0.7);
+    inner.addColorStop(0, "rgba(255, 255, 220, 0.64)");
+    inner.addColorStop(0.48, "rgba(255, 172, 37, 0.34)");
+    inner.addColorStop(1, "rgba(255, 117, 22, 0)");
+    ctx.fillStyle = inner;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.28, -r * 0.48);
+    ctx.quadraticCurveTo(lean * 0.18, -length * 0.36, lean * 0.6, -length * 0.72);
+    ctx.quadraticCurveTo(r * 0.28, -length * 0.42, r * 0.3, -r * 0.48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
   }
 
   drawHeatAura(ctx) {
@@ -709,8 +715,6 @@ class Particle {
     ctx.save();
     ctx.globalAlpha = alpha;
     ctx.fillStyle = this.color;
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
     ctx.fill();
@@ -747,8 +751,6 @@ class EngineParticle {
     ctx.globalCompositeOperation = "lighter";
     ctx.globalAlpha = alpha;
     ctx.fillStyle = this.color;
-    ctx.shadowColor = this.color;
-    ctx.shadowBlur = 12;
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.size * alpha, 0, Math.PI * 2);
     ctx.fill();
@@ -800,6 +802,8 @@ class Game {
     this.lastTime = 0;
     this.scoreRemainder = 0;
     this.shake = 0;
+    this.hudTimer = 0;
+    this.engineEmitTimer = 0;
     this.stars = [];
     this.nebulaClouds = [];
     this.streaks = [];
@@ -818,7 +822,7 @@ class Game {
     this.engineParticlePool = [];
     this.combo = 1;
     this.comboTimer = 0;
-    this.maxFrameTime = 1 / 60;
+    this.maxFrameTime = 1 / 30;
     this.bindUI();
     this.resize();
     this.resetWorld();
@@ -906,9 +910,7 @@ class Game {
     const rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(320, rect.width);
     this.height = Math.max(420, rect.height);
-    const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
-    const maxDpr = coarsePointer || this.width < 760 ? 1 : 1.5;
-    this.dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
+    this.dpr = 1;
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
@@ -922,7 +924,7 @@ class Game {
   }
 
   createStars() {
-    const count = Math.floor((this.width * this.height) / 9000);
+    const count = Math.floor((this.width * this.height) / 30000);
     this.stars = Array.from({ length: count }, () => ({
       x: Math.random() * this.width,
       y: Math.random() * this.height,
@@ -941,7 +943,7 @@ class Game {
       alpha: 0.08 + Math.random() * 0.11,
       drift: 4 + Math.random() * 10,
     }));
-    this.streaks = Array.from({ length: 3 }, () => this.makeStreak(true));
+    this.streaks = Array.from({ length: 1 }, () => this.makeStreak(true));
     this.renderBackgroundLayer();
   }
 
@@ -955,6 +957,7 @@ class Game {
       this.drawCoverImage(ctx, this.battleBackground);
       ctx.fillStyle = "rgba(0, 3, 14, 0.1)";
       ctx.fillRect(0, 0, this.width, this.height);
+      this.drawStaticSpaceOverlay(ctx);
       return;
     }
 
@@ -1029,6 +1032,8 @@ class Game {
     ctx.arc(this.width * 0.91, this.height * 0.2, this.width * 0.13, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
+
+    this.drawStaticSpaceOverlay(ctx);
   }
 
   drawCoverImage(ctx, image, offsetX = 0, offsetY = 0) {
@@ -1040,6 +1045,21 @@ class Game {
     const x = -extraX / 2 + offsetX;
     const y = -extraY / 2 + offsetY;
     ctx.drawImage(image, x, y, drawWidth, drawHeight);
+  }
+
+  drawStaticSpaceOverlay(ctx) {
+    const glow = ctx.createRadialGradient(this.width * 0.5, this.height * 0.76, 0, this.width * 0.5, this.height * 0.76, this.width * 0.55);
+    glow.addColorStop(0, "rgba(25, 231, 255, 0.08)");
+    glow.addColorStop(0.45, "rgba(124, 58, 237, 0.05)");
+    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
+    ctx.fillStyle = glow;
+    ctx.fillRect(0, 0, this.width, this.height);
+
+    const vignette = ctx.createRadialGradient(this.width * 0.5, this.height * 0.5, this.height * 0.18, this.width * 0.5, this.height * 0.5, this.width * 0.72);
+    vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
+    vignette.addColorStop(1, "rgba(0, 0, 0, 0.42)");
+    ctx.fillStyle = vignette;
+    ctx.fillRect(0, 0, this.width, this.height);
   }
 
   makeStreak(randomY = false) {
@@ -1068,6 +1088,8 @@ class Game {
     this.slowTimer = 0;
     this.scoreRemainder = 0;
     this.shake = 0;
+    this.hudTimer = 0;
+    this.engineEmitTimer = 0;
   }
 
   startGame() {
@@ -1212,7 +1234,7 @@ class Game {
     }
 
     this.player.update(dt, this.input);
-    this.spawnEngineExhaust();
+    this.spawnEngineExhaust(dt);
     this.slowTimer = Math.max(0, this.slowTimer - dt);
     const slowFactor = this.slowTimer > 0 ? 0.5 : 1;
 
@@ -1234,15 +1256,22 @@ class Game {
     this.checkCollisions();
     this.meteors = this.meteors.filter((m) => !m.isOffscreen());
     this.powerUps = this.powerUps.filter((p) => !p.isOffscreen());
-    this.updateHud();
+    this.hudTimer -= dt;
+    if (this.hudTimer <= 0) {
+      this.updateHud();
+      this.hudTimer = 0.08;
+    }
   }
 
-  spawnEngineExhaust() {
+  spawnEngineExhaust(dt) {
+    this.engineEmitTimer -= dt;
+    if (this.engineEmitTimer > 0) return;
     const count = Math.abs(this.player.vx) > this.player.maxSpeed * 0.55 ? 2 : 1;
     for (let i = 0; i < count; i += 1) {
       const particle = this.engineParticlePool.pop() || new EngineParticle();
       this.engineParticles.push(particle.reset(this.player.x, this.player.y));
     }
+    this.engineEmitTimer = Math.abs(this.player.vx) > 0 ? 0.026 : 0.044;
   }
 
   updateStars(dt) {
@@ -1321,7 +1350,7 @@ class Game {
     return dx * dx + dy * dy < radius * radius;
   }
 
-  explode(x, y, color = "#ff8a1f", amount = 42) {
+  explode(x, y, color = "#ff8a1f", amount = 30) {
     for (let i = 0; i < amount; i += 1) {
       const palette = [color, "#ffe45c", "#ff4d5d", "#f8fbff"];
       this.particles.push(new Particle(x, y, palette[i % palette.length], 360, 0.75, 6));
@@ -1378,49 +1407,29 @@ class Game {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     this.streaks.forEach((streak) => {
-      const g = ctx.createLinearGradient(streak.x, streak.y, streak.x + streak.length, streak.y - streak.length * 0.36);
-      g.addColorStop(0, "rgba(25, 231, 255, 0)");
-      g.addColorStop(0.72, `rgba(156, 201, 255, ${streak.alpha})`);
-      g.addColorStop(1, "rgba(242, 92, 255, 0)");
-      ctx.strokeStyle = g;
+      ctx.globalAlpha = streak.alpha;
+      ctx.strokeStyle = "rgba(156, 201, 255, 0.78)";
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.moveTo(streak.x, streak.y);
       ctx.lineTo(streak.x + streak.length, streak.y - streak.length * 0.36);
       ctx.stroke();
     });
+    ctx.globalAlpha = 1;
     ctx.restore();
 
     this.stars.forEach((star) => {
       ctx.globalAlpha = star.alpha * (0.65 + Math.sin(star.twinkle) * 0.25);
       ctx.fillStyle = star.hue;
-      ctx.beginPath();
-      ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
-      ctx.fill();
+      if (star.r < 1.15) {
+        ctx.fillRect(star.x, star.y, star.r + 0.65, star.r + 0.65);
+      } else {
+        ctx.beginPath();
+        ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
+        ctx.fill();
+      }
     });
     ctx.globalAlpha = 1;
-
-    ctx.strokeStyle = "rgba(25, 231, 255, 0.08)";
-    ctx.lineWidth = 1;
-    for (let y = (this.height + this.elapsed * 16) % 92; y < this.height; y += 92) {
-      ctx.beginPath();
-      ctx.moveTo(0, y);
-      ctx.lineTo(this.width, y + this.height * 0.12);
-      ctx.stroke();
-    }
-
-    const glow = ctx.createRadialGradient(this.width * 0.5, this.height * 0.76, 0, this.width * 0.5, this.height * 0.76, this.width * 0.55);
-    glow.addColorStop(0, "rgba(25, 231, 255, 0.08)");
-    glow.addColorStop(0.45, "rgba(124, 58, 237, 0.05)");
-    glow.addColorStop(1, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, this.width, this.height);
-
-    const vignette = ctx.createRadialGradient(this.width * 0.5, this.height * 0.5, this.height * 0.18, this.width * 0.5, this.height * 0.5, this.width * 0.72);
-    vignette.addColorStop(0, "rgba(0, 0, 0, 0)");
-    vignette.addColorStop(1, "rgba(0, 0, 0, 0.42)");
-    ctx.fillStyle = vignette;
-    ctx.fillRect(0, 0, this.width, this.height);
   }
 
   loop(time) {
