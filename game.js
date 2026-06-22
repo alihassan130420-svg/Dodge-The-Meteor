@@ -303,21 +303,29 @@ class Player {
 }
 
 class Meteor {
-  constructor(game) {
+  constructor(game, spawnSpec) {
+    this.reset(game, spawnSpec);
+  }
+
+  reset(game, spawnSpec = null) {
     this.game = game;
-    this.radius = 18 + Math.random() * 26;
-    this.x = this.radius + Math.random() * (game.width - this.radius * 2);
-    this.y = -this.radius - 20;
-    const d = game.difficulty();
-    this.vx = (Math.random() - 0.5) * 42;
-    this.vy = d.meteorSpeed * (0.78 + Math.random() * 0.55);
+    const spec = spawnSpec || game.difficultyManager.createMeteorSpec(game.width);
+    this.type = spec.type || "normal";
+    this.size = spec.size || "medium";
+    this.theme = this.themeForType(this.type);
+    this.radius = spec.radius;
+    this.x = spec.x;
+    this.y = spec.y;
+    this.vx = spec.vx;
+    this.vy = spec.vy;
     this.rotation = Math.random() * Math.PI * 2;
-    this.spin = (Math.random() - 0.5) * 3.5;
+    this.spin = (Math.random() - 0.5) * (this.type === "fast" ? 5.2 : 3.5);
     this.flamePhase = Math.random() * Math.PI * 2;
     this.visualTilt = -0.16 + (Math.random() - 0.5) * 0.14;
     this.nearMissAwarded = false;
-    this.hasTrail = Math.random() < 0.58;
-    this.tailLength = this.radius * (2.35 + Math.random() * 1.15);
+    this.hasTrail = spec.hasTrail;
+    const tailBoost = this.type === "fast" ? 1.25 : this.type === "explosive" ? 1.12 : 1;
+    this.tailLength = this.radius * (2.35 + Math.random() * 1.15) * tailBoost;
     this.tailLean = (Math.random() - 0.5) * this.radius * 0.75 - this.vx * 0.06;
     const pointCount = 10;
     this.points = Array.from({ length: pointCount }, (_, i) => {
@@ -348,6 +356,72 @@ class Meteor {
       shade: Math.random(),
     }));
     this.rockSprite = this.buildRockSprite();
+    return this;
+  }
+
+  themeForType(type) {
+    const themes = {
+      normal: {
+        aura0: "rgba(255, 171, 54, 0.34)",
+        aura1: "rgba(255, 92, 31, 0.18)",
+        aura2: "rgba(255, 37, 26, 0)",
+        rim: "rgba(255, 120, 32, 0.84)",
+        rimSoft: "rgba(255, 226, 137, 0.34)",
+        glow: "#ff7623",
+        lava0: "rgba(255, 252, 202, 0.96)",
+        lava1: "rgba(255, 151, 31, 0.9)",
+        lava2: "rgba(255, 54, 22, 0.16)",
+      },
+      fast: {
+        aura0: "rgba(255, 220, 84, 0.32)",
+        aura1: "rgba(255, 126, 24, 0.2)",
+        aura2: "rgba(255, 40, 20, 0)",
+        rim: "rgba(255, 190, 54, 0.9)",
+        rimSoft: "rgba(255, 245, 168, 0.38)",
+        glow: "#ffb12b",
+        lava0: "rgba(255, 255, 220, 0.96)",
+        lava1: "rgba(255, 177, 31, 0.9)",
+        lava2: "rgba(255, 78, 22, 0.18)",
+      },
+      large: {
+        aura0: "rgba(255, 118, 34, 0.36)",
+        aura1: "rgba(255, 70, 28, 0.18)",
+        aura2: "rgba(255, 20, 18, 0)",
+        rim: "rgba(255, 105, 27, 0.84)",
+        rimSoft: "rgba(255, 198, 120, 0.3)",
+        glow: "#ff6c1f",
+        lava0: "rgba(255, 240, 174, 0.94)",
+        lava1: "rgba(255, 128, 30, 0.86)",
+        lava2: "rgba(215, 40, 20, 0.16)",
+      },
+      special: {
+        aura0: "rgba(168, 85, 247, 0.32)",
+        aura1: "rgba(49, 215, 255, 0.16)",
+        aura2: "rgba(168, 85, 247, 0)",
+        rim: "rgba(168, 85, 247, 0.88)",
+        rimSoft: "rgba(49, 215, 255, 0.34)",
+        glow: "#a855f7",
+        lava0: "rgba(235, 252, 255, 0.96)",
+        lava1: "rgba(49, 215, 255, 0.84)",
+        lava2: "rgba(168, 85, 247, 0.18)",
+      },
+      explosive: {
+        aura0: "rgba(255, 77, 93, 0.34)",
+        aura1: "rgba(255, 138, 31, 0.2)",
+        aura2: "rgba(255, 77, 93, 0)",
+        rim: "rgba(255, 77, 93, 0.88)",
+        rimSoft: "rgba(255, 228, 92, 0.34)",
+        glow: "#ff4d5d",
+        lava0: "rgba(255, 255, 210, 0.98)",
+        lava1: "rgba(255, 228, 92, 0.9)",
+        lava2: "rgba(255, 77, 93, 0.22)",
+      },
+    };
+    return themes[type] || themes.normal;
+  }
+
+  withAlpha(color, alpha) {
+    return color.replace(/rgba\(([^,]+),\s*([^,]+),\s*([^,]+),\s*[^)]+\)/, `rgba($1, $2, $3, ${alpha})`);
   }
 
   update(dt, slowFactor) {
@@ -406,10 +480,10 @@ class Meteor {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
     const gradient = ctx.createLinearGradient(0, -r * 0.3, lean, -length);
-    gradient.addColorStop(0, "rgba(255, 245, 160, 0.58)");
-    gradient.addColorStop(0.34, "rgba(255, 117, 22, 0.38)");
-    gradient.addColorStop(0.72, "rgba(255, 50, 28, 0.16)");
-    gradient.addColorStop(1, "rgba(255, 47, 22, 0)");
+    gradient.addColorStop(0, this.withAlpha(this.theme.lava0, 0.58));
+    gradient.addColorStop(0.34, this.withAlpha(this.theme.lava1, 0.38));
+    gradient.addColorStop(0.72, this.withAlpha(this.theme.rim, 0.16));
+    gradient.addColorStop(1, this.theme.aura2);
     ctx.fillStyle = gradient;
     ctx.beginPath();
     ctx.moveTo(-r * 0.72, -r * 0.34);
@@ -435,8 +509,8 @@ class Meteor {
 
     const inner = ctx.createLinearGradient(0, -r * 0.35, lean * 0.65, -length * 0.7);
     inner.addColorStop(0, "rgba(255, 255, 220, 0.64)");
-    inner.addColorStop(0.48, "rgba(255, 172, 37, 0.34)");
-    inner.addColorStop(1, "rgba(255, 117, 22, 0)");
+    inner.addColorStop(0.48, this.withAlpha(this.theme.lava1, 0.34));
+    inner.addColorStop(1, this.theme.aura2);
     ctx.fillStyle = inner;
     ctx.beginPath();
     ctx.moveTo(-r * 0.28, -r * 0.48);
@@ -450,12 +524,12 @@ class Meteor {
   drawHeatAura(ctx) {
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = "rgba(255, 104, 31, 0.9)";
+    ctx.shadowColor = this.theme.glow;
     ctx.shadowBlur = 26;
     const aura = ctx.createRadialGradient(0, 0, this.radius * 0.28, 0, 0, this.radius * 2.25);
-    aura.addColorStop(0, "rgba(255, 171, 54, 0.34)");
-    aura.addColorStop(0.46, "rgba(255, 92, 31, 0.18)");
-    aura.addColorStop(1, "rgba(255, 37, 26, 0)");
+    aura.addColorStop(0, this.theme.aura0);
+    aura.addColorStop(0.46, this.theme.aura1);
+    aura.addColorStop(1, this.theme.aura2);
     ctx.fillStyle = aura;
     ctx.beginPath();
     ctx.arc(0, 0, this.radius * 2.25, 0, Math.PI * 2);
@@ -465,7 +539,7 @@ class Meteor {
 
   drawRockBody(ctx) {
     ctx.save();
-    ctx.shadowColor = "rgba(255, 119, 29, 0.78)";
+    ctx.shadowColor = this.theme.glow;
     ctx.shadowBlur = 12;
     const rock = ctx.createRadialGradient(-this.radius * 0.36, -this.radius * 0.4, 2, this.radius * 0.24, this.radius * 0.24, this.radius * 1.18);
     rock.addColorStop(0, "#d18a5d");
@@ -480,14 +554,14 @@ class Meteor {
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = "#ff7623";
+    ctx.shadowColor = this.theme.glow;
     ctx.shadowBlur = 18;
     this.traceRock(ctx, 1.01);
-    ctx.strokeStyle = "rgba(255, 120, 32, 0.84)";
+    ctx.strokeStyle = this.theme.rim;
     ctx.lineWidth = Math.max(2.2, this.radius * 0.075);
     ctx.stroke();
     this.traceRock(ctx, 0.98);
-    ctx.strokeStyle = "rgba(255, 226, 137, 0.34)";
+    ctx.strokeStyle = this.theme.rimSoft;
     ctx.lineWidth = Math.max(1, this.radius * 0.026);
     ctx.stroke();
     ctx.restore();
@@ -514,12 +588,12 @@ class Meteor {
     this.lavaVeins.forEach((vein) => {
       const [p0, p1, p2] = vein.points;
       const hot = ctx.createLinearGradient(p0.x, p0.y, p2.x, p2.y);
-      hot.addColorStop(0, "rgba(255, 252, 202, 0.96)");
-      hot.addColorStop(0.36, "rgba(255, 151, 31, 0.9)");
-      hot.addColorStop(1, "rgba(255, 54, 22, 0.16)");
+      hot.addColorStop(0, this.theme.lava0);
+      hot.addColorStop(0.36, this.theme.lava1);
+      hot.addColorStop(1, this.theme.lava2);
       ctx.strokeStyle = hot;
       ctx.lineWidth = vein.width;
-      ctx.shadowColor = "#ff8a1f";
+      ctx.shadowColor = this.theme.glow;
       ctx.shadowBlur = 14;
       ctx.beginPath();
       ctx.moveTo(p0.x, p0.y);
@@ -794,6 +868,7 @@ class Game {
     this.input = new InputManager();
     this.input.onChange = () => this.applyImmediateInput();
     this.audio = new AudioSystem();
+    this.difficultyManager = new DifficultyManager();
     this.width = 0;
     this.height = 0;
     this.dpr = 1;
@@ -820,6 +895,7 @@ class Game {
     };
     this.powerUpImage.src = "sheild and slow time.png";
     this.engineParticlePool = [];
+    this.meteorPool = [];
     this.combo = 1;
     this.comboTimer = 0;
     this.maxFrameTime = 1 / 30;
@@ -1073,6 +1149,10 @@ class Game {
   }
 
   resetWorld() {
+    if (this.meteors) {
+      this.meteors.forEach((meteor) => this.recycleMeteor(meteor));
+    }
+    this.difficultyManager.reset();
     this.player = new Player(this);
     this.meteors = [];
     this.powerUps = [];
@@ -1083,13 +1163,30 @@ class Game {
     this.score = 0;
     this.combo = 1;
     this.comboTimer = 0;
-    this.spawnTimer = 0.7;
+    this.spawnTimer = this.difficultyManager.getNextSpawnDelay();
     this.powerTimer = 7;
     this.slowTimer = 0;
     this.scoreRemainder = 0;
     this.shake = 0;
     this.hudTimer = 0;
     this.engineEmitTimer = 0;
+  }
+
+  spawnMeteor(spawnSpec) {
+    const meteor = this.meteorPool.pop();
+    if (meteor) {
+      this.meteors.push(meteor.reset(this, spawnSpec));
+      return;
+    }
+    this.meteors.push(new Meteor(this, spawnSpec));
+  }
+
+  recycleMeteor(meteor) {
+    if (!meteor) return;
+    meteor.rockSprite = null;
+    if (this.meteorPool.length < 50) {
+      this.meteorPool.push(meteor);
+    }
   }
 
   startGame() {
@@ -1183,22 +1280,7 @@ class Game {
   }
 
   difficulty() {
-    const t = this.elapsed;
-    const phase = Math.min(t / 58, 1);
-    let spawnRate = 1.04 - phase * 0.64;
-    let meteorSpeed = 150 + phase * 180;
-    if (t > 20) {
-      spawnRate -= Math.min((t - 20) / 60, 1) * 0.14;
-      meteorSpeed += Math.min((t - 20) / 60, 1) * 60;
-    }
-    if (t > 40) {
-      spawnRate -= Math.min((t - 40) / 60, 1) * 0.18;
-      meteorSpeed += Math.min((t - 40) / 60, 1) * 75;
-    }
-    return {
-      spawnRate: Math.max(0.23, spawnRate),
-      meteorSpeed: Math.min(520, meteorSpeed),
-    };
+    return this.difficultyManager.getSettings();
   }
 
   update(dt) {
@@ -1224,6 +1306,7 @@ class Game {
     }
 
     this.elapsed += dt;
+    this.difficultyManager.update(dt, this.elapsed);
     this.comboTimer = Math.max(0, this.comboTimer - dt);
     if (this.comboTimer <= 0) this.combo = 1;
     this.scoreRemainder += dt * 10;
@@ -1240,9 +1323,13 @@ class Game {
 
     this.spawnTimer -= dt;
     if (this.spawnTimer <= 0) {
-      this.meteors.push(new Meteor(this));
-      this.spawnTimer = this.difficulty().spawnRate * (0.72 + Math.random() * 0.48);
-      if (this.elapsed > 42 && Math.random() < 0.2) this.spawnTimer *= 0.55;
+      if (this.difficultyManager.canSpawn(this.meteors.length)) {
+        const batch = this.difficultyManager.createSpawnBatch(this.width, this.meteors.length);
+        batch.forEach((spawnSpec) => this.spawnMeteor(spawnSpec));
+        this.spawnTimer += this.difficultyManager.getNextSpawnDelay();
+      } else {
+        this.spawnTimer = 0.12;
+      }
     }
 
     this.powerTimer -= dt;
@@ -1254,7 +1341,11 @@ class Game {
     this.meteors.forEach((m) => m.update(dt, slowFactor));
     this.powerUps.forEach((p) => p.update(dt));
     this.checkCollisions();
-    this.meteors = this.meteors.filter((m) => !m.isOffscreen());
+    for (let i = this.meteors.length - 1; i >= 0; i -= 1) {
+      if (this.meteors[i].isOffscreen()) {
+        this.recycleMeteor(this.meteors.splice(i, 1)[0]);
+      }
+    }
     this.powerUps = this.powerUps.filter((p) => !p.isOffscreen());
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
@@ -1375,10 +1466,7 @@ class Game {
   }
 
   sectorName() {
-    if (this.elapsed > 60) return "Meteor Fury";
-    if (this.elapsed > 40) return "Crimson Drift";
-    if (this.elapsed > 20) return "Purple Void";
-    return "Deep Blue Space";
+    return this.difficultyManager.phaseName;
   }
 
   draw() {
