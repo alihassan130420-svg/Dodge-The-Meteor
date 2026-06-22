@@ -141,7 +141,10 @@ class Player {
     this.height = 70;
     this.x = game.width / 2;
     this.y = game.height - 96;
-    this.speed = 760;
+    this.vx = 0;
+    this.maxSpeed = 860;
+    this.acceleration = 5600;
+    this.drag = 13;
     this.shield = false;
     this.flamePhase = 0;
     this.bank = 0;
@@ -149,9 +152,29 @@ class Player {
 
   update(dt, input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    this.x += direction * this.speed * dt;
-    this.bank += (direction * 0.22 - this.bank) * Math.min(1, dt * 10);
-    this.x = Math.max(this.width / 2 + 8, Math.min(this.game.width - this.width / 2 - 8, this.x));
+    if (direction !== 0) {
+      this.vx += direction * this.acceleration * dt;
+    } else {
+      const dragFactor = Math.max(0, 1 - this.drag * dt);
+      this.vx *= dragFactor;
+      if (Math.abs(this.vx) < 4) this.vx = 0;
+    }
+
+    this.vx = Math.max(-this.maxSpeed, Math.min(this.maxSpeed, this.vx));
+    this.x += this.vx * dt;
+
+    const minX = this.width / 2 + 8;
+    const maxX = this.game.width - this.width / 2 - 8;
+    if (this.x < minX) {
+      this.x = minX;
+      this.vx = Math.max(0, this.vx) * 0.25;
+    } else if (this.x > maxX) {
+      this.x = maxX;
+      this.vx = Math.min(0, this.vx) * 0.25;
+    }
+
+    const targetBank = direction !== 0 ? direction * 0.24 : Math.max(-0.18, Math.min(0.18, this.vx / this.maxSpeed * 0.2));
+    this.bank += (targetBank - this.bank) * Math.min(1, dt * 12);
     const mobileLift = window.matchMedia("(pointer: coarse)").matches || this.game.width < 760;
     this.y = this.game.height - (mobileLift ? 158 : Math.max(86, this.game.height * 0.13));
     this.flamePhase += dt * 18;
@@ -271,7 +294,8 @@ class Meteor {
     this.x = this.radius + Math.random() * (game.width - this.radius * 2);
     this.y = -this.radius - 20;
     const d = game.difficulty();
-    this.speed = d.meteorSpeed * (0.78 + Math.random() * 0.55);
+    this.vx = (Math.random() - 0.5) * 42;
+    this.vy = d.meteorSpeed * (0.78 + Math.random() * 0.55);
     this.rotation = Math.random() * Math.PI * 2;
     this.spin = (Math.random() - 0.5) * 3.5;
     this.nearMissAwarded = false;
@@ -294,7 +318,8 @@ class Meteor {
   }
 
   update(dt, slowFactor) {
-    this.y += this.speed * slowFactor * dt;
+    this.x += this.vx * slowFactor * dt;
+    this.y += this.vy * slowFactor * dt;
     this.rotation += this.spin * dt;
   }
 
@@ -401,12 +426,12 @@ class PowerUp {
     this.radius = 18;
     this.x = 28 + Math.random() * (game.width - 56);
     this.y = -32;
-    this.speed = 120 + Math.random() * 60;
+    this.vy = 120 + Math.random() * 60;
     this.phase = Math.random() * Math.PI * 2;
   }
 
   update(dt) {
-    this.y += this.speed * dt;
+    this.y += this.vy * dt;
     this.phase += dt * 5;
   }
 
@@ -472,7 +497,11 @@ class Particle {
 }
 
 class EngineParticle {
-  constructor(x, y) {
+  constructor(x = 0, y = 0) {
+    this.reset(x, y);
+  }
+
+  reset(x, y) {
     this.x = x + (Math.random() - 0.5) * 14;
     this.y = y + 28 + Math.random() * 10;
     this.vx = (Math.random() - 0.5) * 34;
@@ -481,6 +510,7 @@ class EngineParticle {
     this.maxLife = this.life;
     this.size = 2 + Math.random() * 3.5;
     this.color = Math.random() < 0.72 ? "#31d7ff" : "#ff8a1f";
+    return this;
   }
 
   update(dt) {
@@ -555,8 +585,12 @@ class Game {
     this.battleBackground = new Image();
     this.battleBackground.onload = () => this.renderBackgroundLayer();
     this.battleBackground.src = "battle-background.png";
+    this.engineParticlePool = [];
     this.combo = 1;
     this.comboTimer = 0;
+    this.fixedStep = 1 / 60;
+    this.accumulator = 0;
+    this.maxFrameTime = 0.1;
     this.bindUI();
     this.resize();
     this.resetWorld();
@@ -789,6 +823,8 @@ class Game {
     this.ui.hud.classList.remove("hidden");
     this.syncBest();
     this.updateHud();
+    this.lastTime = performance.now();
+    this.accumulator = 0;
   }
 
   pauseGame() {
@@ -893,7 +929,12 @@ class Game {
     this.engineParticles.forEach((p) => p.update(dt));
     this.texts.forEach((t) => t.update(dt));
     this.particles = this.particles.filter((p) => p.life > 0);
-    this.engineParticles = this.engineParticles.filter((p) => p.life > 0);
+    for (let i = this.engineParticles.length - 1; i >= 0; i -= 1) {
+      if (this.engineParticles[i].life <= 0) {
+        this.engineParticlePool.push(this.engineParticles[i]);
+        this.engineParticles.splice(i, 1);
+      }
+    }
     this.texts = this.texts.filter((t) => t.life > 0);
     if (this.shake > 0) this.shake -= dt;
 
@@ -915,9 +956,7 @@ class Game {
     }
 
     this.player.update(dt, this.input);
-    for (let i = 0; i < 2; i += 1) {
-      this.engineParticles.push(new EngineParticle(this.player.x, this.player.y));
-    }
+    this.spawnEngineExhaust();
     this.slowTimer = Math.max(0, this.slowTimer - dt);
     const slowFactor = this.slowTimer > 0 ? 0.5 : 1;
 
@@ -940,6 +979,14 @@ class Game {
     this.meteors = this.meteors.filter((m) => !m.isOffscreen());
     this.powerUps = this.powerUps.filter((p) => !p.isOffscreen());
     this.updateHud();
+  }
+
+  spawnEngineExhaust() {
+    const count = Math.abs(this.player.vx) > this.player.maxSpeed * 0.55 ? 3 : 2;
+    for (let i = 0; i < count; i += 1) {
+      const particle = this.engineParticlePool.pop() || new EngineParticle();
+      this.engineParticles.push(particle.reset(this.player.x, this.player.y));
+    }
   }
 
   updateStars(dt) {
@@ -965,13 +1012,15 @@ class Game {
   checkCollisions() {
     const player = this.player.collisionCircle();
     for (const meteor of this.meteors) {
-      const dist = Math.hypot(player.x - meteor.x, player.y - meteor.y);
-      if (dist < player.r + meteor.radius * 0.72) {
+      const hitRadius = player.r + meteor.radius * 0.72;
+      if (this.circleOverlap(player.x, player.y, hitRadius, meteor.x, meteor.y, 0)) {
         if (this.player.shield) {
           this.player.shield = false;
-          this.shake = 0.24;
+          this.shake = Math.max(this.shake, 0.28);
           this.explode(meteor.x, meteor.y, "#31d7ff");
           meteor.y = this.height + meteor.radius + 80;
+          meteor.vy = Math.abs(meteor.vy) * 0.35;
+          this.player.vx *= -0.35;
           this.texts.push(new FloatingText("Shield Saved You", this.player.x, this.player.y - 54, "#31d7ff"));
           this.audio.power();
         } else {
@@ -980,7 +1029,8 @@ class Game {
         return;
       }
 
-      if (!meteor.nearMissAwarded && meteor.y > player.y - 8 && meteor.y < player.y + 58 && dist < player.r + meteor.radius + 34) {
+      const nearRadius = player.r + meteor.radius + 34;
+      if (!meteor.nearMissAwarded && meteor.y > player.y - 8 && meteor.y < player.y + 58 && this.circleOverlap(player.x, player.y, nearRadius, meteor.x, meteor.y, 0)) {
         meteor.nearMissAwarded = true;
         this.combo = Math.min(9, this.combo + 1);
         this.comboTimer = 3.2;
@@ -992,8 +1042,7 @@ class Game {
     }
 
     for (const power of this.powerUps) {
-      const dist = Math.hypot(player.x - power.x, player.y - power.y);
-      if (dist < player.r + power.radius) {
+      if (this.circleOverlap(player.x, player.y, player.r + power.radius, power.x, power.y, 0)) {
         if (power.type === "shield") {
           this.player.shield = true;
           this.texts.push(new FloatingText("Shield Ready", power.x, power.y, "#31d7ff"));
@@ -1007,6 +1056,13 @@ class Game {
         this.audio.power();
       }
     }
+  }
+
+  circleOverlap(ax, ay, ar, bx, by, br) {
+    const dx = ax - bx;
+    const dy = ay - by;
+    const radius = ar + br;
+    return dx * dx + dy * dy < radius * radius;
   }
 
   explode(x, y, color = "#ff8a1f", amount = 42) {
@@ -1120,9 +1176,18 @@ class Game {
   }
 
   loop(time) {
-    const dt = Math.min((time - this.lastTime) / 1000 || 0, 0.033);
+    const frameDt = Math.min((time - this.lastTime) / 1000 || 0, this.maxFrameTime);
     this.lastTime = time;
-    this.update(dt);
+    this.accumulator += frameDt;
+
+    let steps = 0;
+    while (this.accumulator >= this.fixedStep && steps < 5) {
+      this.update(this.fixedStep);
+      this.accumulator -= this.fixedStep;
+      steps += 1;
+    }
+    if (steps === 5) this.accumulator = 0;
+
     this.draw();
     requestAnimationFrame((next) => this.loop(next));
   }
