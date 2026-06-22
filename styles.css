@@ -306,7 +306,7 @@ button:active {
   inset: 22px 14px auto 14px;
   z-index: 5;
   display: grid;
-  grid-template-columns: 238px 1fr 320px;
+  grid-template-columns: 238px minmax(240px, 1fr);
   align-items: start;
   gap: 12px;
   pointer-events: none;
@@ -350,6 +350,7 @@ button:active {
 
 .hud-right {
   display: grid;
+  justify-self: end;
   justify-items: end;
   gap: 10px;
 }

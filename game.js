@@ -328,20 +328,34 @@ class Meteor {
     this.visualTilt = -0.16 + (Math.random() - 0.5) * 0.14;
     this.nearMissAwarded = false;
     this.hasTrail = Math.random() < 0.58;
+    this.tailLength = this.radius * (2.35 + Math.random() * 1.15);
+    this.tailLean = (Math.random() - 0.5) * this.radius * 0.75 - this.vx * 0.06;
     this.points = Array.from({ length: 13 }, (_, i) => {
       const a = (i / 13) * Math.PI * 2;
       return { a, r: this.radius * (0.72 + Math.random() * 0.38) };
     });
-    this.cracks = Array.from({ length: 4 + Math.floor(Math.random() * 4) }, () => ({
-      a: Math.random() * Math.PI * 2,
-      len: this.radius * (0.35 + Math.random() * 0.44),
-      bend: (Math.random() - 0.5) * 0.9,
-      width: 1 + Math.random() * 2,
-    }));
+    this.lavaVeins = Array.from({ length: 5 + Math.floor(Math.random() * 4) }, () => {
+      const a = Math.random() * Math.PI * 2;
+      const bend = (Math.random() - 0.5) * 0.95;
+      const start = this.radius * (0.06 + Math.random() * 0.18);
+      const mid = this.radius * (0.32 + Math.random() * 0.2);
+      const end = this.radius * (0.58 + Math.random() * 0.26);
+      return {
+        width: 1.15 + Math.random() * 2.2,
+        fork: Math.random() < 0.42,
+        forkTurn: (Math.random() - 0.5) * 0.95,
+        points: [
+          { x: Math.cos(a) * start, y: Math.sin(a) * start },
+          { x: Math.cos(a + bend * 0.46) * mid, y: Math.sin(a + bend * 0.46) * mid },
+          { x: Math.cos(a + bend) * end, y: Math.sin(a + bend) * end },
+        ],
+      };
+    });
     this.craters = Array.from({ length: 4 + Math.floor(Math.random() * 4) }, () => ({
       a: Math.random() * Math.PI * 2,
       d: this.radius * (0.12 + Math.random() * 0.48),
       r: this.radius * (0.08 + Math.random() * 0.13),
+      shade: Math.random(),
     }));
   }
 
@@ -357,173 +371,211 @@ class Meteor {
     ctx.translate(this.x, this.y);
     ctx.rotate(this.visualTilt + Math.sin(this.flamePhase * 0.45) * 0.035);
 
-    if (this.game.meteorImageReady) {
-      this.drawImageMeteor(ctx);
-      ctx.restore();
-      return;
-    }
-
-    if (this.hasTrail) {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      const trail = ctx.createLinearGradient(0, -this.radius * 0.4, -this.radius * 3.4, -this.radius * 2.2);
-      trail.addColorStop(0, "rgba(255, 231, 156, 0.55)");
-      trail.addColorStop(0.32, "rgba(255, 103, 31, 0.28)");
-      trail.addColorStop(1, "rgba(255, 77, 93, 0)");
-      ctx.fillStyle = trail;
-      ctx.beginPath();
-      ctx.ellipse(-this.radius * 1.45, -this.radius * 1.05, this.radius * 2.1, this.radius * 0.52, -0.62, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    }
+    this.drawFlameTrail(ctx);
 
     ctx.rotate(this.rotation);
-    ctx.shadowColor = "rgba(255, 104, 31, 0.85)";
-    ctx.shadowBlur = 24;
-    const aura = ctx.createRadialGradient(0, 0, this.radius * 0.4, 0, 0, this.radius * 2.2);
-    aura.addColorStop(0, "rgba(255, 128, 38, 0.28)");
-    aura.addColorStop(0.45, "rgba(255, 92, 31, 0.17)");
-    aura.addColorStop(1, "rgba(255, 77, 93, 0)");
-    ctx.fillStyle = aura;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.radius * 2.2, 0, Math.PI * 2);
-    ctx.fill();
+    this.drawHeatAura(ctx);
+    this.drawRockBody(ctx);
+    this.drawLavaVeins(ctx);
+    this.drawCraters(ctx);
+    this.drawRockHighlights(ctx);
+    ctx.restore();
+  }
 
-    ctx.shadowBlur = 8;
-    const rock = ctx.createRadialGradient(-this.radius * 0.35, -this.radius * 0.42, 2, 0, 0, this.radius * 1.1);
-    rock.addColorStop(0, "#d49a72");
-    rock.addColorStop(0.18, "#985d43");
-    rock.addColorStop(0.58, "#56364a");
-    rock.addColorStop(1, "#1a1322");
-    ctx.fillStyle = rock;
+  traceRock(ctx, scale = 1) {
     ctx.beginPath();
     this.points.forEach((p, i) => {
-      const px = Math.cos(p.a) * p.r;
-      const py = Math.sin(p.a) * p.r;
+      const px = Math.cos(p.a) * p.r * scale;
+      const py = Math.sin(p.a) * p.r * scale;
       if (i === 0) ctx.moveTo(px, py);
       else ctx.lineTo(px, py);
     });
     ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = "rgba(18, 10, 20, 0.92)";
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
+  }
+
+  drawFlameTrail(ctx) {
+    if (!this.hasTrail) return;
+
+    const r = this.radius;
+    const pulse = 0.92 + Math.sin(this.flamePhase) * 0.08;
+    const length = this.tailLength * pulse;
+    const lean = this.tailLean + Math.sin(this.flamePhase * 0.8) * r * 0.22;
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    this.cracks.forEach((crack) => {
-      const x1 = Math.cos(crack.a) * this.radius * 0.12;
-      const y1 = Math.sin(crack.a) * this.radius * 0.12;
-      const x2 = Math.cos(crack.a + crack.bend) * crack.len;
-      const y2 = Math.sin(crack.a + crack.bend) * crack.len;
-      const hot = ctx.createLinearGradient(x1, y1, x2, y2);
-      hot.addColorStop(0, "rgba(255, 247, 190, 0.95)");
-      hot.addColorStop(0.35, "rgba(255, 136, 25, 0.78)");
-      hot.addColorStop(1, "rgba(255, 45, 20, 0)");
-      ctx.strokeStyle = hot;
-      ctx.lineWidth = crack.width;
-      ctx.shadowColor = "#ff7a1f";
-      ctx.shadowBlur = 12;
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo((x1 + x2) * 0.52 + Math.sin(crack.a) * 8, (y1 + y2) * 0.52 - Math.cos(crack.a) * 8);
-      ctx.lineTo(x2, y2);
-      ctx.stroke();
-    });
+    this.paintFlameLayer(ctx, r, length, lean, 1.16, 22, "rgba(255, 47, 22, 0)", "rgba(255, 86, 24, 0.34)", "rgba(255, 202, 89, 0.48)");
+    this.paintFlameLayer(ctx, r, length * 0.82, lean * 0.72, 0.78, 15, "rgba(255, 70, 18, 0)", "rgba(255, 138, 24, 0.46)", "rgba(255, 238, 142, 0.6)");
+    this.paintFlameLayer(ctx, r, length * 0.58, lean * 0.44, 0.42, 10, "rgba(255, 128, 18, 0)", "rgba(255, 219, 93, 0.64)", "rgba(255, 255, 221, 0.74)");
     ctx.restore();
+  }
 
-    this.craters.forEach((crater) => {
-      const a = crater.a + this.radius;
-      ctx.beginPath();
-      ctx.fillStyle = "rgba(12, 8, 17, 0.62)";
-      ctx.arc(Math.cos(a) * crater.d, Math.sin(a) * crater.d, crater.r, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.strokeStyle = "rgba(255, 178, 95, 0.16)";
-      ctx.lineWidth = 1;
-      ctx.stroke();
-    });
-
-    ctx.fillStyle = "rgba(255, 225, 160, 0.22)";
+  paintFlameLayer(ctx, r, length, lean, width, blur, tipColor, midColor, baseColor) {
+    const wobble = Math.sin(this.flamePhase * 1.8 + width * 3) * r * 0.16;
+    const gradient = ctx.createLinearGradient(0, -r * 0.3, lean, -length);
+    gradient.addColorStop(0, baseColor);
+    gradient.addColorStop(0.48, midColor);
+    gradient.addColorStop(1, tipColor);
+    ctx.fillStyle = gradient;
+    ctx.shadowColor = midColor;
+    ctx.shadowBlur = blur;
     ctx.beginPath();
-    ctx.ellipse(-this.radius * 0.34, -this.radius * 0.36, this.radius * 0.36, this.radius * 0.16, -0.5, 0, Math.PI * 2);
+    ctx.moveTo(-r * 0.72 * width, -r * 0.2);
+    ctx.bezierCurveTo(
+      -r * 0.34 * width + wobble,
+      -r * 0.98,
+      lean - r * 0.44 * width,
+      -length * 0.58,
+      lean + wobble * 0.5,
+      -length
+    );
+    ctx.bezierCurveTo(
+      lean + r * 0.5 * width,
+      -length * 0.62,
+      r * 0.9 * width - wobble * 0.3,
+      -r * 1.02,
+      r * 0.48 * width,
+      -r * 0.18
+    );
+    ctx.quadraticCurveTo(0, -r * 0.55, -r * 0.72 * width, -r * 0.2);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  drawHeatAura(ctx) {
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = "rgba(255, 104, 31, 0.9)";
+    ctx.shadowBlur = 26;
+    const aura = ctx.createRadialGradient(0, 0, this.radius * 0.28, 0, 0, this.radius * 2.25);
+    aura.addColorStop(0, "rgba(255, 171, 54, 0.34)");
+    aura.addColorStop(0.46, "rgba(255, 92, 31, 0.18)");
+    aura.addColorStop(1, "rgba(255, 37, 26, 0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.radius * 2.25, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
 
-  drawImageMeteor(ctx) {
-    const image = this.game.meteorImage;
-    const scale = (this.radius * 2.2) / 108;
-    const rockCenterX = 70;
-    const rockCenterY = 118;
-    const drawWidth = image.width * scale;
-    const drawHeight = image.height * scale;
-    const drawX = -rockCenterX * scale;
-    const drawY = -rockCenterY * scale;
-    const pulse = 0.88 + Math.sin(this.flamePhase) * 0.12;
-    const tailLength = this.radius * (2.7 + pulse * 0.45);
-
-    if (this.hasTrail) {
-      ctx.save();
-      ctx.globalCompositeOperation = "lighter";
-      for (let i = 0; i < 3; i += 1) {
-        const wave = Math.sin(this.flamePhase * (1.15 + i * 0.22) + i * 1.7);
-        const offset = (i - 1) * this.radius * 0.18;
-        const gradient = ctx.createLinearGradient(this.radius * 0.1, -this.radius * 0.75, this.radius * 1.95, -tailLength);
-        gradient.addColorStop(0, `rgba(255, 245, 170, ${0.32 + pulse * 0.16})`);
-        gradient.addColorStop(0.36, `rgba(255, 135, 24, ${0.2 + pulse * 0.14})`);
-        gradient.addColorStop(1, "rgba(255, 48, 40, 0)");
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.moveTo(this.radius * 0.2 + offset, -this.radius * 0.78);
-        ctx.quadraticCurveTo(
-          this.radius * (0.92 + wave * 0.16),
-          -this.radius * (1.55 + i * 0.18),
-          this.radius * (1.55 + wave * 0.28),
-          -tailLength
-        );
-        ctx.quadraticCurveTo(
-          this.radius * (1.08 - wave * 0.12),
-          -this.radius * (1.72 + i * 0.16),
-          this.radius * -0.18 + offset * 0.5,
-          -this.radius * 0.36
-        );
-        ctx.closePath();
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
+  drawRockBody(ctx) {
     ctx.save();
-    ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = "#ff7a1f";
-    ctx.shadowBlur = 22 + pulse * 14;
-    const aura = ctx.createRadialGradient(0, 0, this.radius * 0.4, 0, 0, this.radius * 2.5);
-    aura.addColorStop(0, "rgba(255, 151, 39, 0.2)");
-    aura.addColorStop(0.45, "rgba(255, 92, 31, 0.12)");
-    aura.addColorStop(1, "rgba(255, 77, 93, 0)");
-    ctx.fillStyle = aura;
-    ctx.beginPath();
-    ctx.arc(0, 0, this.radius * 2.5, 0, Math.PI * 2);
+    ctx.shadowColor = "rgba(255, 119, 29, 0.78)";
+    ctx.shadowBlur = 12;
+    const rock = ctx.createRadialGradient(-this.radius * 0.36, -this.radius * 0.4, 2, this.radius * 0.24, this.radius * 0.24, this.radius * 1.18);
+    rock.addColorStop(0, "#d18a5d");
+    rock.addColorStop(0.17, "#9b624d");
+    rock.addColorStop(0.48, "#503445");
+    rock.addColorStop(0.78, "#281726");
+    rock.addColorStop(1, "#100911");
+    ctx.fillStyle = rock;
+    this.traceRock(ctx);
     ctx.fill();
     ctx.restore();
 
     ctx.save();
-    ctx.shadowColor = "rgba(255, 120, 34, 0.8)";
-    ctx.shadowBlur = 12 + pulse * 8;
-    ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
+    ctx.globalCompositeOperation = "lighter";
+    ctx.shadowColor = "#ff7623";
+    ctx.shadowBlur = 18;
+    this.traceRock(ctx, 1.01);
+    ctx.strokeStyle = "rgba(255, 120, 32, 0.84)";
+    ctx.lineWidth = Math.max(2.2, this.radius * 0.075);
+    ctx.stroke();
+    this.traceRock(ctx, 0.98);
+    ctx.strokeStyle = "rgba(255, 226, 137, 0.34)";
+    ctx.lineWidth = Math.max(1, this.radius * 0.026);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawLavaVeins(ctx) {
+    ctx.save();
+    this.traceRock(ctx, 0.94);
+    ctx.clip();
+    ctx.lineCap = "round";
+    ctx.lineJoin = "round";
+
+    this.lavaVeins.forEach((vein) => {
+      const [p0, p1, p2] = vein.points;
+      ctx.strokeStyle = "rgba(20, 9, 12, 0.76)";
+      ctx.lineWidth = vein.width + 3.6;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.quadraticCurveTo(p1.x, p1.y, p2.x, p2.y);
+      ctx.stroke();
+    });
+
+    ctx.globalCompositeOperation = "lighter";
+    this.lavaVeins.forEach((vein) => {
+      const [p0, p1, p2] = vein.points;
+      const hot = ctx.createLinearGradient(p0.x, p0.y, p2.x, p2.y);
+      hot.addColorStop(0, "rgba(255, 252, 202, 0.96)");
+      hot.addColorStop(0.36, "rgba(255, 151, 31, 0.9)");
+      hot.addColorStop(1, "rgba(255, 54, 22, 0.16)");
+      ctx.strokeStyle = hot;
+      ctx.lineWidth = vein.width;
+      ctx.shadowColor = "#ff8a1f";
+      ctx.shadowBlur = 14;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.quadraticCurveTo(p1.x, p1.y, p2.x, p2.y);
+      ctx.stroke();
+
+      if (vein.fork) {
+        const fx = p1.x + Math.cos(Math.atan2(p2.y - p0.y, p2.x - p0.x) + vein.forkTurn) * this.radius * 0.22;
+        const fy = p1.y + Math.sin(Math.atan2(p2.y - p0.y, p2.x - p0.x) + vein.forkTurn) * this.radius * 0.22;
+        ctx.lineWidth = Math.max(0.9, vein.width * 0.55);
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(fx, fy);
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+
+  drawCraters(ctx) {
+    ctx.save();
+    this.traceRock(ctx, 0.96);
+    ctx.clip();
+    this.craters.forEach((crater) => {
+      const a = crater.a + this.radius;
+      const x = Math.cos(a) * crater.d;
+      const y = Math.sin(a) * crater.d;
+      const craterShade = ctx.createRadialGradient(x - crater.r * 0.3, y - crater.r * 0.36, 1, x, y, crater.r * 1.1);
+      craterShade.addColorStop(0, `rgba(98, 64, 60, ${0.24 + crater.shade * 0.18})`);
+      craterShade.addColorStop(0.64, "rgba(20, 12, 19, 0.7)");
+      craterShade.addColorStop(1, "rgba(2, 1, 5, 0.42)");
+      ctx.beginPath();
+      ctx.fillStyle = craterShade;
+      ctx.arc(x, y, crater.r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "rgba(255, 178, 95, 0.18)";
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    });
+    ctx.restore();
+  }
+
+  drawRockHighlights(ctx) {
+    ctx.save();
+    this.traceRock(ctx, 0.98);
+    ctx.clip();
+    const highlight = ctx.createLinearGradient(-this.radius * 0.7, -this.radius * 0.65, this.radius * 0.35, this.radius * 0.5);
+    highlight.addColorStop(0, "rgba(255, 232, 174, 0.28)");
+    highlight.addColorStop(0.36, "rgba(255, 185, 99, 0.08)");
+    highlight.addColorStop(1, "rgba(255, 255, 255, 0)");
+    ctx.fillStyle = highlight;
+    ctx.beginPath();
+    ctx.ellipse(-this.radius * 0.34, -this.radius * 0.38, this.radius * 0.48, this.radius * 0.22, -0.48, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    for (let i = 0; i < 5; i += 1) {
-      const sparkPhase = this.flamePhase * (1.4 + i * 0.17) + i * 2.1;
-      const sparkX = this.radius * (0.45 + Math.sin(sparkPhase) * 0.85);
-      const sparkY = -this.radius * (1.3 + ((sparkPhase * 0.23) % 1) * 1.8);
-      ctx.fillStyle = `rgba(255, ${155 + i * 14}, 58, ${0.52 - i * 0.06})`;
-      ctx.beginPath();
-      ctx.arc(sparkX, sparkY, Math.max(1.3, this.radius * (0.045 + i * 0.006)), 0, Math.PI * 2);
-      ctx.fill();
-    }
+    ctx.fillStyle = "rgba(255, 225, 160, 0.22)";
+    ctx.beginPath();
+    ctx.ellipse(-this.radius * 0.44, -this.radius * 0.45, this.radius * 0.22, this.radius * 0.07, -0.46, 0, Math.PI * 2);
+    ctx.fill();
     ctx.restore();
   }
 
@@ -757,12 +809,6 @@ class Game {
     this.battleBackground.onload = () => this.renderBackgroundLayer();
     this.battleBackground.src = "battle-background.png";
     this.battleBackgroundReady = false;
-    this.meteorImage = new Image();
-    this.meteorImageReady = false;
-    this.meteorImage.onload = () => {
-      this.meteorImageReady = true;
-    };
-    this.meteorImage.src = "meteriot.png";
     this.powerUpImage = new Image();
     this.powerUpImageReady = false;
     this.powerUpImage.onload = () => {
