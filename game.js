@@ -150,7 +150,11 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 1180;
+    this.maxSpeed = 1050;
+    this.minMoveSpeed = 260;
+    this.acceleration = (this.maxSpeed - this.minMoveSpeed) / 1.5;
+    this.brakeAcceleration = this.maxSpeed / 0.18;
+    this.turnAcceleration = this.maxSpeed / 0.12;
     this.inputDirection = 0;
     this.shield = false;
     this.flamePhase = 0;
@@ -160,7 +164,24 @@ class Player {
   update(dt, input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
     this.inputDirection = direction;
-    this.vx = direction * this.maxSpeed;
+
+    if (direction !== 0) {
+      const sameDirection = Math.sign(this.vx) === direction || Math.abs(this.vx) < 1;
+      if (!sameDirection) {
+        this.vx = this.moveToward(this.vx, 0, this.turnAcceleration * dt);
+        if (Math.abs(this.vx) < this.minMoveSpeed * 0.35) {
+          this.vx = direction * this.minMoveSpeed;
+        }
+      } else {
+        if (Math.abs(this.vx) < this.minMoveSpeed) {
+          this.vx = direction * this.minMoveSpeed;
+        }
+        this.vx = this.moveToward(this.vx, direction * this.maxSpeed, this.acceleration * dt);
+      }
+    } else {
+      this.vx = this.moveToward(this.vx, 0, this.brakeAcceleration * dt);
+    }
+
     this.x += this.vx * dt;
 
     const minX = this.width / 2 + 8;
@@ -182,16 +203,26 @@ class Player {
 
   applyImmediateInput(input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    const previousDirection = this.inputDirection;
     this.inputDirection = direction;
-    this.vx = direction * this.maxSpeed;
 
     const minX = this.width / 2 + 8;
     const maxX = this.game.width - this.width / 2 - 8;
-    if (direction !== 0 && direction !== previousDirection) {
-      this.x += direction * Math.min(18, this.maxSpeed / 90);
+
+    if (direction !== 0) {
+      const sameDirection = Math.sign(this.vx) === direction;
+      if (!sameDirection || Math.abs(this.vx) < this.minMoveSpeed) {
+        this.vx = direction * this.minMoveSpeed;
+      }
+    } else if (Math.abs(this.vx) < this.minMoveSpeed) {
+      this.vx = 0;
     }
+
     this.x = Math.max(minX, Math.min(maxX, this.x));
+  }
+
+  moveToward(value, target, maxDelta) {
+    if (Math.abs(target - value) <= maxDelta) return target;
+    return value + Math.sign(target - value) * maxDelta;
   }
 
   draw(ctx) {
