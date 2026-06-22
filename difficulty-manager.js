@@ -80,10 +80,9 @@ class MeteorPatternManager {
   }
 
   diagonalRain(count) {
-    const side = Math.random() < 0.5 ? "left" : "right";
     return Array.from({ length: count }, (_, index) => ({
       pattern: "diagonalRain",
-      direction: side === "left" ? "diagonalRight" : "diagonalLeft",
+      direction: "diagonalRight",
       edgeBias: Math.random() * 0.34,
       angle: 20 + Math.random() * 25,
       yOffset: index * 34,
@@ -104,7 +103,7 @@ class MeteorPatternManager {
 
     return lanes.map((lane, index) => ({
       pattern: "wave",
-      direction: Math.random() < 0.22 ? (Math.random() < 0.5 ? "diagonalLeft" : "diagonalRight") : "vertical",
+      direction: Math.random() < 0.22 ? "diagonalRight" : "vertical",
       lane,
       laneCount,
       yOffset: index * 22,
@@ -116,7 +115,7 @@ class MeteorPatternManager {
       const diagonal = Math.random() < settings.diagonalChance;
       return {
         pattern: "mixed",
-        direction: diagonal ? (Math.random() < 0.5 ? "diagonalLeft" : "diagonalRight") : "vertical",
+        direction: diagonal ? "diagonalRight" : "vertical",
         xRatio: Math.random(),
         angle: 20 + Math.random() * 25,
         yOffset: index * 26,
@@ -139,23 +138,23 @@ class MeteorPatternManager {
 
 class DifficultyManager {
   constructor() {
-    this.maxMeteorSpeed = 820;
-    this.minSpawnInterval = 0.25;
+    this.maxMeteorSpeed = 960;
+    this.minSpawnInterval = 0.18;
     this.patternManager = new MeteorPatternManager();
     this.phases = [
       {
         name: "Training Zone",
         start: 0,
         settings: {
-          spawnInterval: 0.75,
-          speedMin: 230,
-          speedMax: 320,
-          minActive: 8,
-          maxActive: 14,
-          maxBatch: 3,
+          spawnInterval: 0.38,
+          speedMin: 300,
+          speedMax: 420,
+          minActive: 14,
+          maxActive: 24,
+          maxBatch: 4,
           diagonalChance: 0,
-          sizeWeights: { small: 0.48, medium: 0.36, large: 0.16 },
-          typeWeights: { normal: 0.55, fast: 0.3, large: 0.15, special: 0, explosive: 0 },
+          sizeWeights: { small: 0.38, medium: 0.4, large: 0.22 },
+          typeWeights: { normal: 0.4, fast: 0.38, large: 0.22, special: 0, explosive: 0 },
           patternWeights: { verticalRain: 1, group: 0, diagonalRain: 0, wave: 0, mixed: 0 },
           groupCooldown: 99,
           waveCooldown: 99,
@@ -166,17 +165,17 @@ class DifficultyManager {
         name: "Beginner Challenge",
         start: 20,
         settings: {
-          spawnInterval: 0.5,
-          speedMin: 320,
-          speedMax: 450,
-          minActive: 12,
-          maxActive: 20,
-          maxBatch: 4,
+          spawnInterval: 0.25,
+          speedMin: 430,
+          speedMax: 600,
+          minActive: 22,
+          maxActive: 34,
+          maxBatch: 5,
           diagonalChance: 0,
-          sizeWeights: { small: 0.4, medium: 0.39, large: 0.21 },
-          typeWeights: { normal: 0.42, fast: 0.32, large: 0.2, special: 0.06, explosive: 0 },
-          patternWeights: { verticalRain: 0.58, group: 0.42, diagonalRain: 0, wave: 0, mixed: 0 },
-          groupCooldown: 3.4,
+          sizeWeights: { small: 0.3, medium: 0.42, large: 0.28 },
+          typeWeights: { normal: 0.28, fast: 0.36, large: 0.25, special: 0.11, explosive: 0 },
+          patternWeights: { verticalRain: 0.42, group: 0.58, diagonalRain: 0, wave: 0, mixed: 0 },
+          groupCooldown: 2.4,
           waveCooldown: 99,
           stormCooldown: 99,
         },
@@ -185,17 +184,17 @@ class DifficultyManager {
         name: "Medium Survival",
         start: 45,
         settings: {
-          spawnInterval: 0.38,
-          speedMin: 430,
-          speedMax: 580,
-          minActive: 18,
-          maxActive: 28,
-          maxBatch: 5,
+          spawnInterval: 0.2,
+          speedMin: 570,
+          speedMax: 760,
+          minActive: 32,
+          maxActive: 48,
+          maxBatch: 7,
           diagonalChance: 0,
-          sizeWeights: { small: 0.32, medium: 0.4, large: 0.28 },
-          typeWeights: { normal: 0.32, fast: 0.3, large: 0.25, special: 0.13, explosive: 0 },
-          patternWeights: { verticalRain: 0.46, group: 0.54, diagonalRain: 0, wave: 0, mixed: 0 },
-          groupCooldown: 2.6,
+          sizeWeights: { small: 0.24, medium: 0.42, large: 0.34 },
+          typeWeights: { normal: 0.22, fast: 0.34, large: 0.27, special: 0.17, explosive: 0 },
+          patternWeights: { verticalRain: 0.34, group: 0.66, diagonalRain: 0, wave: 0, mixed: 0 },
+          groupCooldown: 1.8,
           waveCooldown: 99,
           stormCooldown: 99,
         },
@@ -204,38 +203,38 @@ class DifficultyManager {
         name: "Hard Mode",
         start: 120,
         settings: {
-          spawnInterval: 0.25,
-          speedMin: 560,
-          speedMax: 740,
-          minActive: 26,
-          maxActive: 40,
-          maxBatch: 6,
-          diagonalChance: 0.42,
-          sizeWeights: { small: 0.26, medium: 0.4, large: 0.34 },
-          typeWeights: { normal: 0.22, fast: 0.32, large: 0.25, special: 0.16, explosive: 0.05 },
-          patternWeights: { verticalRain: 0.22, group: 0.26, diagonalRain: 0.24, wave: 0, mixed: 0.28 },
-          groupCooldown: 2,
+          spawnInterval: 0.18,
+          speedMin: 700,
+          speedMax: 900,
+          minActive: 44,
+          maxActive: 64,
+          maxBatch: 8,
+          diagonalChance: 0.55,
+          sizeWeights: { small: 0.18, medium: 0.4, large: 0.42 },
+          typeWeights: { normal: 0.14, fast: 0.34, large: 0.27, special: 0.18, explosive: 0.07 },
+          patternWeights: { verticalRain: 0.12, group: 0.22, diagonalRain: 0.3, wave: 0, mixed: 0.36 },
+          groupCooldown: 1.4,
           waveCooldown: 99,
-          stormCooldown: 3.2,
+          stormCooldown: 2.5,
         },
       },
       {
         name: "Extreme Survival",
         start: 300,
         settings: {
-          spawnInterval: 0.25,
-          speedMin: 680,
-          speedMax: 820,
-          minActive: 34,
-          maxActive: 48,
-          maxBatch: 7,
-          diagonalChance: 0.58,
-          sizeWeights: { small: 0.22, medium: 0.38, large: 0.4 },
-          typeWeights: { normal: 0.16, fast: 0.3, large: 0.24, special: 0.18, explosive: 0.12 },
-          patternWeights: { verticalRain: 0.08, group: 0.18, diagonalRain: 0.28, wave: 0.22, mixed: 0.24 },
-          groupCooldown: 1.6,
-          waveCooldown: 4.8,
-          stormCooldown: 2.5,
+          spawnInterval: 0.18,
+          speedMin: 820,
+          speedMax: 960,
+          minActive: 56,
+          maxActive: 78,
+          maxBatch: 10,
+          diagonalChance: 0.68,
+          sizeWeights: { small: 0.14, medium: 0.36, large: 0.5 },
+          typeWeights: { normal: 0.1, fast: 0.3, large: 0.24, special: 0.2, explosive: 0.16 },
+          patternWeights: { verticalRain: 0.05, group: 0.14, diagonalRain: 0.34, wave: 0.22, mixed: 0.25 },
+          groupCooldown: 1.1,
+          waveCooldown: 3.8,
+          stormCooldown: 1.9,
         },
       },
     ];
@@ -323,7 +322,22 @@ class DifficultyManager {
       target.phaseName = "Infinite Storm";
     }
 
-    return this.applyMinuteDiagonalStorm(time, target);
+    const stormTarget = this.applyMinuteDiagonalStorm(time, target);
+    return this.applyFirstMinuteDifficultyEase(time, stormTarget);
+  }
+
+  applyFirstMinuteDifficultyEase(time, target) {
+    if (time >= 60) return target;
+
+    const easedTarget = this.cloneSettings(target);
+    easedTarget.phaseName = target.phaseName;
+    easedTarget.forceDiagonalOnly = target.forceDiagonalOnly;
+    easedTarget.spawnInterval = Math.max(this.minSpawnInterval, target.spawnInterval * 1.1);
+    easedTarget.speedMin = Math.max(1, target.speedMin * 0.9);
+    easedTarget.speedMax = Math.max(easedTarget.speedMin, target.speedMax * 0.9);
+    easedTarget.minActive = Math.max(1, target.minActive * 0.9);
+    easedTarget.maxActive = Math.max(easedTarget.minActive + 1, target.maxActive * 0.9);
+    return easedTarget;
   }
 
   applyMinuteDiagonalStorm(time, target) {
@@ -345,6 +359,19 @@ class DifficultyManager {
     stormTarget.groupCooldown = 99;
     stormTarget.waveCooldown = 99;
     stormTarget.stormCooldown = 0;
+
+    if (minute === 1) {
+      stormTarget.phaseName = "Intro Diagonal Storm";
+      stormTarget.spawnInterval = Math.max(0.62, target.spawnInterval * 2.3);
+      stormTarget.speedMin = Math.min(this.maxMeteorSpeed * 0.7, target.speedMin * 0.72);
+      stormTarget.speedMax = Math.min(this.maxMeteorSpeed * 0.72, target.speedMax * 0.76);
+      stormTarget.minActive = Math.min(target.minActive, 16);
+      stormTarget.maxActive = target.maxActive + 1;
+      stormTarget.maxBatch = 2;
+      stormTarget.sizeWeights = { small: 0.62, medium: 0.3, large: 0.08 };
+      stormTarget.typeWeights = { normal: 0.7, fast: 0.2, large: 0.1, special: 0, explosive: 0 };
+    }
+
     return stormTarget;
   }
 
@@ -355,7 +382,7 @@ class DifficultyManager {
   getNextSpawnDelay() {
     if (this.firstDelayPending) {
       this.firstDelayPending = false;
-      return 0.32;
+      return 0.24;
     }
     return Math.max(this.minSpawnInterval, this.current.spawnInterval);
   }
@@ -390,7 +417,7 @@ class DifficultyManager {
 
   resolveMovement(width, radius, speed, placement, settings) {
     const direction = placement.direction || (Math.random() < settings.diagonalChance
-      ? (Math.random() < 0.5 ? "diagonalLeft" : "diagonalRight")
+      ? "diagonalRight"
       : "vertical");
 
     if (direction === "diagonalLeft" || direction === "diagonalRight") {
