@@ -27,6 +27,9 @@ body {
   background: var(--bg);
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 button {
@@ -496,6 +499,7 @@ button:active {
 
 .mobile-controls button {
   pointer-events: auto;
+  touch-action: none;
   width: min(32vw, 140px);
   min-height: 62px;
   border: 1px solid rgba(49, 215, 255, 0.35);

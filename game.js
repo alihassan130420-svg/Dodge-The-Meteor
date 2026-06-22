@@ -142,9 +142,7 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 860;
-    this.acceleration = 5600;
-    this.drag = 13;
+    this.maxSpeed = 980;
     this.shield = false;
     this.flamePhase = 0;
     this.bank = 0;
@@ -152,15 +150,7 @@ class Player {
 
   update(dt, input) {
     const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
-    if (direction !== 0) {
-      this.vx += direction * this.acceleration * dt;
-    } else {
-      const dragFactor = Math.max(0, 1 - this.drag * dt);
-      this.vx *= dragFactor;
-      if (Math.abs(this.vx) < 4) this.vx = 0;
-    }
-
-    this.vx = Math.max(-this.maxSpeed, Math.min(this.maxSpeed, this.vx));
+    this.vx = direction * this.maxSpeed;
     this.x += this.vx * dt;
 
     const minX = this.width / 2 + 8;
@@ -173,8 +163,8 @@ class Player {
       this.vx = Math.min(0, this.vx) * 0.25;
     }
 
-    const targetBank = direction !== 0 ? direction * 0.24 : Math.max(-0.18, Math.min(0.18, this.vx / this.maxSpeed * 0.2));
-    this.bank += (targetBank - this.bank) * Math.min(1, dt * 12);
+    const targetBank = direction * 0.2;
+    this.bank += (targetBank - this.bank) * Math.min(1, dt * 28);
     const mobileLift = window.matchMedia("(pointer: coarse)").matches || this.game.width < 760;
     this.y = this.game.height - (mobileLift ? 158 : Math.max(86, this.game.height * 0.13));
     this.flamePhase += dt * 18;
@@ -585,12 +575,11 @@ class Game {
     this.battleBackground = new Image();
     this.battleBackground.onload = () => this.renderBackgroundLayer();
     this.battleBackground.src = "battle-background.png";
+    this.battleBackgroundReady = false;
     this.engineParticlePool = [];
     this.combo = 1;
     this.comboTimer = 0;
-    this.fixedStep = 1 / 60;
-    this.accumulator = 0;
-    this.maxFrameTime = 0.1;
+    this.maxFrameTime = 1 / 30;
     this.bindUI();
     this.resize();
     this.resetWorld();
@@ -674,7 +663,7 @@ class Game {
   }
 
   createStars() {
-    const count = Math.floor((this.width * this.height) / 4200);
+    const count = Math.floor((this.width * this.height) / 9000);
     this.stars = Array.from({ length: count }, () => ({
       x: Math.random() * this.width,
       y: Math.random() * this.height,
@@ -693,7 +682,7 @@ class Game {
       alpha: 0.08 + Math.random() * 0.11,
       drift: 4 + Math.random() * 10,
     }));
-    this.streaks = Array.from({ length: 5 }, () => this.makeStreak(true));
+    this.streaks = Array.from({ length: 3 }, () => this.makeStreak(true));
     this.renderBackgroundLayer();
   }
 
@@ -702,6 +691,15 @@ class Game {
     this.backgroundLayer.width = Math.max(1, Math.floor(this.width));
     this.backgroundLayer.height = Math.max(1, Math.floor(this.height));
 
+    if (this.battleBackground.complete && this.battleBackground.naturalWidth > 0) {
+      this.battleBackgroundReady = true;
+      this.drawCoverImage(ctx, this.battleBackground);
+      ctx.fillStyle = "rgba(0, 3, 14, 0.1)";
+      ctx.fillRect(0, 0, this.width, this.height);
+      return;
+    }
+
+    this.battleBackgroundReady = false;
     const gradient = ctx.createLinearGradient(0, 0, this.width, this.height);
     gradient.addColorStop(0, "#02030d");
     gradient.addColorStop(0.28, "#061743");
@@ -824,7 +822,6 @@ class Game {
     this.syncBest();
     this.updateHud();
     this.lastTime = performance.now();
-    this.accumulator = 0;
   }
 
   pauseGame() {
@@ -982,7 +979,7 @@ class Game {
   }
 
   spawnEngineExhaust() {
-    const count = Math.abs(this.player.vx) > this.player.maxSpeed * 0.55 ? 3 : 2;
+    const count = Math.abs(this.player.vx) > this.player.maxSpeed * 0.55 ? 2 : 1;
     for (let i = 0; i < count; i += 1) {
       const particle = this.engineParticlePool.pop() || new EngineParticle();
       this.engineParticles.push(particle.reset(this.player.x, this.player.y));
@@ -1113,16 +1110,7 @@ class Game {
   }
 
   drawBackground(ctx) {
-    const imageReady = this.battleBackground.complete && this.battleBackground.naturalWidth > 0;
-    if (imageReady) {
-      const driftX = Math.sin(this.elapsed * 0.035) * 12;
-      const driftY = Math.cos(this.elapsed * 0.028) * 8;
-      this.drawCoverImage(ctx, this.battleBackground, driftX, driftY);
-      ctx.fillStyle = "rgba(0, 3, 14, 0.18)";
-      ctx.fillRect(0, 0, this.width, this.height);
-    } else {
-      ctx.drawImage(this.backgroundLayer, 0, 0, this.width, this.height);
-    }
+    ctx.drawImage(this.backgroundLayer, 0, 0, this.width, this.height);
 
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
@@ -1143,14 +1131,11 @@ class Game {
     this.stars.forEach((star) => {
       ctx.globalAlpha = star.alpha * (0.65 + Math.sin(star.twinkle) * 0.25);
       ctx.fillStyle = star.hue;
-      ctx.shadowColor = star.hue;
-      ctx.shadowBlur = star.r > 1.8 ? 10 : 0;
       ctx.beginPath();
       ctx.arc(star.x, star.y, star.r, 0, Math.PI * 2);
       ctx.fill();
     });
     ctx.globalAlpha = 1;
-    ctx.shadowBlur = 0;
 
     ctx.strokeStyle = "rgba(25, 231, 255, 0.08)";
     ctx.lineWidth = 1;
@@ -1178,16 +1163,7 @@ class Game {
   loop(time) {
     const frameDt = Math.min((time - this.lastTime) / 1000 || 0, this.maxFrameTime);
     this.lastTime = time;
-    this.accumulator += frameDt;
-
-    let steps = 0;
-    while (this.accumulator >= this.fixedStep && steps < 5) {
-      this.update(this.fixedStep);
-      this.accumulator -= this.fixedStep;
-      steps += 1;
-    }
-    if (steps === 5) this.accumulator = 0;
-
+    this.update(frameDt);
     this.draw();
     requestAnimationFrame((next) => this.loop(next));
   }
