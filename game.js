@@ -150,9 +150,9 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 1520;
-    this.acceleration = 34000;
-    this.deceleration = 54000;
+    this.maxSpeed = 1360;
+    this.acceleration = 90000;
+    this.deceleration = 90000;
     this.inputDirection = 0;
     this.shield = false;
     this.flamePhase = 0;
@@ -190,8 +190,8 @@ class Player {
     this.inputDirection = direction;
     if (direction === 0) {
       this.vx = 0;
-    } else if (Math.sign(this.vx) !== direction || Math.abs(this.vx) < this.maxSpeed * 0.72) {
-      this.vx = direction * this.maxSpeed * 0.72;
+    } else {
+      this.vx = direction * this.maxSpeed;
     }
 
     const minX = this.width / 2 + 8;
@@ -772,7 +772,7 @@ class Game {
     this.engineParticlePool = [];
     this.combo = 1;
     this.comboTimer = 0;
-    this.maxFrameTime = 1 / 30;
+    this.maxFrameTime = 1 / 60;
     this.bindUI();
     this.resize();
     this.resetWorld();
@@ -873,7 +873,6 @@ class Game {
   applyImmediateInput() {
     if (this.state !== "playing" || !this.player) return;
     this.player.applyImmediateInput(this.input);
-    this.draw();
   }
 
   createStars() {
