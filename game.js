@@ -4,6 +4,7 @@ class InputManager {
     this.right = false;
     this.pausePressed = false;
     this.keys = new Set();
+    this.onChange = null;
     this.bindKeyboard();
   }
 
@@ -14,6 +15,7 @@ class InputManager {
       }
       this.keys.add(event.code);
       this.syncKeys();
+      this.notifyChange();
       if (event.code === "Escape" || event.code === "KeyP") {
         this.pausePressed = true;
       }
@@ -22,6 +24,7 @@ class InputManager {
     window.addEventListener("keyup", (event) => {
       this.keys.delete(event.code);
       this.syncKeys();
+      this.notifyChange();
     });
   }
 
@@ -33,6 +36,11 @@ class InputManager {
   setTouch(direction, pressed) {
     if (direction === "left") this.left = pressed;
     if (direction === "right") this.right = pressed;
+    this.notifyChange();
+  }
+
+  notifyChange() {
+    if (this.onChange) this.onChange(this);
   }
 }
 
@@ -168,6 +176,18 @@ class Player {
     const mobileLift = window.matchMedia("(pointer: coarse)").matches || this.game.width < 760;
     this.y = this.game.height - (mobileLift ? 158 : Math.max(86, this.game.height * 0.13));
     this.flamePhase += dt * 18;
+  }
+
+  applyImmediateInput(input) {
+    const direction = (input.right ? 1 : 0) - (input.left ? 1 : 0);
+    this.vx = direction * this.maxSpeed;
+    if (direction !== 0) {
+      this.x += direction * 18;
+    }
+
+    const minX = this.width / 2 + 8;
+    const maxX = this.game.width - this.width / 2 - 8;
+    this.x = Math.max(minX, Math.min(maxX, this.x));
   }
 
   draw(ctx) {
@@ -558,6 +578,7 @@ class Game {
     this.root = document.querySelector(".game-shell");
     this.ctx = this.canvas.getContext("2d");
     this.input = new InputManager();
+    this.input.onChange = () => this.applyImmediateInput();
     this.audio = new AudioSystem();
     this.width = 0;
     this.height = 0;
@@ -644,6 +665,10 @@ class Game {
       button.addEventListener("pointerup", release);
       button.addEventListener("pointercancel", release);
       button.addEventListener("pointerleave", release);
+      button.addEventListener("touchstart", press, { passive: false });
+      button.addEventListener("touchend", release, { passive: false });
+      button.addEventListener("mousedown", press);
+      button.addEventListener("mouseup", release);
     });
 
     this.syncBest();
@@ -654,12 +679,20 @@ class Game {
     const rect = this.canvas.getBoundingClientRect();
     this.width = Math.max(320, rect.width);
     this.height = Math.max(420, rect.height);
-    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const coarsePointer = window.matchMedia("(pointer: coarse)").matches;
+    const maxDpr = coarsePointer || this.width < 760 ? 1 : 1.5;
+    this.dpr = Math.min(window.devicePixelRatio || 1, maxDpr);
     this.canvas.width = Math.floor(this.width * this.dpr);
     this.canvas.height = Math.floor(this.height * this.dpr);
     this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.createStars();
     if (this.player) this.player.y = this.height - 96;
+  }
+
+  applyImmediateInput() {
+    if (this.state !== "playing" || !this.player) return;
+    this.player.applyImmediateInput(this.input);
+    this.draw();
   }
 
   createStars() {

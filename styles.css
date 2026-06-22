@@ -24,6 +24,8 @@ body {
   height: 100%;
   margin: 0;
   overflow: hidden;
+  overscroll-behavior: none;
+  touch-action: none;
   background: var(--bg);
   color: var(--text);
   font-family: "Segoe UI", system-ui, sans-serif;
@@ -46,6 +48,7 @@ button {
   height: 100svh;
   min-height: 480px;
   overflow: hidden;
+  touch-action: none;
   background:
     radial-gradient(circle at 24% 68%, rgba(25, 128, 255, 0.28), transparent 34%),
     radial-gradient(circle at 74% 30%, rgba(168, 85, 247, 0.26), transparent 38%),
