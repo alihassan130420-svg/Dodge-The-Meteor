@@ -52,6 +52,7 @@ class AudioSystem {
     this.muted = localStorage.getItem("dtm_muted") === "true";
     this.musicTimer = null;
     this.musicStep = 0;
+    this.musicNodes = [];
   }
 
   ensure() {
@@ -60,17 +61,17 @@ class AudioSystem {
     if (!AudioContextClass) return;
     this.context = new AudioContextClass();
     this.master = this.context.createGain();
-    this.master.gain.value = this.muted ? 0 : 0.24;
+    this.master.gain.value = this.muted ? 0 : 0.42;
     this.master.connect(this.context.destination);
     this.musicGain = this.context.createGain();
-    this.musicGain.gain.value = 0.18;
+    this.musicGain.gain.value = 0.5;
     this.musicGain.connect(this.master);
   }
 
   setMuted(muted) {
     this.muted = muted;
     localStorage.setItem("dtm_muted", String(muted));
-    if (this.master) this.master.gain.value = muted ? 0 : 0.24;
+    if (this.master) this.master.gain.value = muted ? 0 : 0.42;
   }
 
   tone(freq, duration, type = "sine", volume = 0.35, slideTo = null) {
@@ -116,42 +117,92 @@ class AudioSystem {
 
   startMusic() {
     this.ensure();
-    if (!this.context || this.musicTimer) return;
-    if (this.context.state === "suspended") this.context.resume();
+    if (!this.context || this.musicTimer || this.muted) return;
 
-    const bass = [82.41, 82.41, 110, 98, 73.42, 73.42, 98, 110];
-    const lead = [329.63, null, 392, null, 493.88, null, 440, null, 392, null, 329.63, null, 293.66, null, 329.63, null];
-    const pad = [164.81, 196, 246.94, 329.63];
-    this.musicTimer = setInterval(() => {
-      if (!this.context || this.muted) return;
-      const now = this.context.currentTime;
-      const step = this.musicStep % 16;
+    const begin = () => {
+      if (!this.context || this.musicTimer || this.muted) return;
+      this.startDrone();
+      this.playMusicStep();
+      this.musicTimer = setInterval(() => this.playMusicStep(), 240);
+    };
 
-      if (step % 4 === 0) {
-        this.musicNote(bass[(this.musicStep / 4) % bass.length], now, 0.48, "triangle", 0.1, 360);
-        this.kick(now);
-      }
-
-      if (step % 8 === 0) {
-        const root = pad[(this.musicStep / 8) % pad.length];
-        this.musicNote(root, now, 1.6, "sine", 0.025, 900);
-        this.musicNote(root * 1.5, now + 0.03, 1.45, "sine", 0.018, 1200);
-        this.musicNote(root * 2, now + 0.06, 1.35, "triangle", 0.014, 1500);
-      }
-
-      if (lead[step]) {
-        this.musicNote(lead[step], now + 0.02, 0.22, "square", 0.035, 1800);
-      }
-
-      if (step % 2 === 1) this.hat(now);
-      this.musicStep += 1;
-    }, 260);
+    if (this.context.state === "suspended") {
+      this.context.resume().then(begin).catch(begin);
+    } else {
+      begin();
+    }
   }
 
   stopMusic() {
     clearInterval(this.musicTimer);
     this.musicTimer = null;
     this.musicStep = 0;
+    this.stopDrone();
+  }
+
+  playMusicStep() {
+    if (!this.context || this.muted) return;
+    const now = this.context.currentTime + 0.02;
+    const step = this.musicStep % 32;
+    const bass = [82.41, 82.41, 98, 110, 73.42, 73.42, 98, 110];
+    const lead = [329.63, null, 392, null, 493.88, 440, null, 392, 370, null, 329.63, null, 293.66, 329.63, null, 247, 329.63, null, 392, null, 554.37, 493.88, null, 440, 392, null, 370, null, 329.63, 293.66, null, 247];
+    const pad = [164.81, 196, 246.94, 220];
+
+    if (step % 4 === 0) {
+      this.musicNote(bass[Math.floor(this.musicStep / 4) % bass.length], now, 0.46, "sawtooth", 0.18, 520);
+      this.kick(now);
+    }
+
+    if (step % 8 === 0) {
+      const root = pad[Math.floor(this.musicStep / 8) % pad.length];
+      this.musicNote(root, now, 1.4, "triangle", 0.055, 980);
+      this.musicNote(root * 1.5, now + 0.03, 1.25, "sine", 0.04, 1300);
+      this.musicNote(root * 2, now + 0.06, 1.1, "triangle", 0.032, 1700);
+    }
+
+    if (lead[step]) this.musicNote(lead[step], now + 0.015, 0.2, "square", 0.075, 2200);
+    if (step % 2 === 1) this.hat(now);
+    this.musicStep += 1;
+  }
+
+  startDrone() {
+    if (!this.context || this.musicNodes.length) return;
+    const now = this.context.currentTime;
+    [
+      { freq: 55, type: "sine", volume: 0.05 },
+      { freq: 82.41, type: "triangle", volume: 0.035 },
+      { freq: 110, type: "sine", volume: 0.026 },
+    ].forEach(({ freq, type, volume }) => {
+      const osc = this.context.createOscillator();
+      const gain = this.context.createGain();
+      const filter = this.context.createBiquadFilter();
+      osc.type = type;
+      osc.frequency.setValueAtTime(freq, now);
+      filter.type = "lowpass";
+      filter.frequency.setValueAtTime(650, now);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.linearRampToValueAtTime(volume, now + 0.8);
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(now);
+      this.musicNodes.push({ osc, gain });
+    });
+  }
+
+  stopDrone() {
+    if (!this.context) return;
+    const now = this.context.currentTime;
+    this.musicNodes.forEach(({ osc, gain }) => {
+      try {
+        gain.gain.cancelScheduledValues(now);
+        gain.gain.setTargetAtTime(0.0001, now, 0.05);
+        osc.stop(now + 0.2);
+      } catch (error) {
+        // Oscillator may already be stopped by the browser.
+      }
+    });
+    this.musicNodes = [];
   }
 
   musicNote(freq, start, duration, type, volume, filterFreq) {
@@ -182,7 +233,7 @@ class AudioSystem {
     osc.type = "sine";
     osc.frequency.setValueAtTime(92, start);
     osc.frequency.exponentialRampToValueAtTime(42, start + 0.16);
-    gain.gain.setValueAtTime(0.12, start);
+    gain.gain.setValueAtTime(0.2, start);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.18);
     osc.connect(gain);
     gain.connect(this.musicGain);
@@ -202,7 +253,7 @@ class AudioSystem {
     noise.buffer = buffer;
     filter.type = "highpass";
     filter.frequency.setValueAtTime(5200, start);
-    gain.gain.setValueAtTime(0.025, start);
+    gain.gain.setValueAtTime(0.05, start);
     gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.045);
     noise.connect(filter);
     filter.connect(gain);
@@ -1096,6 +1147,7 @@ class Game {
     const click = (id, handler) => {
       document.getElementById(id).addEventListener("click", () => {
         this.audio.click();
+        if (!this.audio.muted) this.audio.startMusic();
         handler();
       });
     };
@@ -1110,8 +1162,19 @@ class Game {
     click("playAgainButton", () => this.startGame());
     click("mainFromGameOverButton", () => this.goToMenu());
 
+    const unlockMusic = () => {
+      if (!this.audio.muted) this.audio.startMusic();
+    };
+    window.addEventListener("pointerdown", unlockMusic, { passive: true });
+    window.addEventListener("keydown", unlockMusic);
+
     this.ui.mute.addEventListener("click", () => {
       this.audio.setMuted(!this.audio.muted);
+      if (this.audio.muted) {
+        this.audio.stopMusic();
+      } else {
+        this.audio.startMusic();
+      }
       this.syncMute();
     });
 
@@ -1388,7 +1451,6 @@ class Game {
   goToMenu() {
     this.state = "menu";
     this.root.classList.remove("is-playing");
-    this.audio.stopMusic();
     this.clearGameplayScene();
     this.hideAllScreens();
     this.ui.mainMenu.classList.remove("hidden");
