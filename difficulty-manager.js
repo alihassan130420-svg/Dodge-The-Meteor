@@ -323,7 +323,21 @@ class DifficultyManager {
     }
 
     const stormTarget = this.applyMinuteDiagonalStorm(time, target);
-    return this.applyFirstMinuteDifficultyEase(time, stormTarget);
+    const reducedTarget = this.applyGlobalDifficultyReduction(stormTarget);
+    return this.applyFirstMinuteDifficultyEase(time, reducedTarget);
+  }
+
+  applyGlobalDifficultyReduction(target) {
+    const reducedTarget = this.cloneSettings(target);
+    reducedTarget.phaseName = target.phaseName;
+    reducedTarget.forceDiagonalOnly = target.forceDiagonalOnly;
+    reducedTarget.spawnInterval = Math.max(this.minSpawnInterval, target.spawnInterval * 1.2);
+    reducedTarget.speedMin = Math.max(1, target.speedMin * 0.8);
+    reducedTarget.speedMax = Math.max(reducedTarget.speedMin, target.speedMax * 0.8);
+    reducedTarget.minActive = Math.max(1, target.minActive * 0.8);
+    reducedTarget.maxActive = Math.max(reducedTarget.minActive + 1, target.maxActive * 0.8);
+    reducedTarget.maxBatch = Math.max(1, target.maxBatch * 0.8);
+    return reducedTarget;
   }
 
   applyFirstMinuteDifficultyEase(time, target) {
@@ -382,7 +396,7 @@ class DifficultyManager {
   getNextSpawnDelay() {
     if (this.firstDelayPending) {
       this.firstDelayPending = false;
-      return 0.24;
+      return 0.29;
     }
     return Math.max(this.minSpawnInterval, this.current.spawnInterval);
   }

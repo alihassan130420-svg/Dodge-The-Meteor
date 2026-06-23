@@ -220,8 +220,8 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 780;
-    this.minMoveSpeed = 190;
+    this.maxSpeed = 936;
+    this.minMoveSpeed = 228;
     this.acceleration = (this.maxSpeed - this.minMoveSpeed) / 2;
     this.brakeAcceleration = this.maxSpeed / 0.18;
     this.turnAcceleration = this.maxSpeed / 0.12;
