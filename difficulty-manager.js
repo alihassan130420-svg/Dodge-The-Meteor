@@ -53,7 +53,7 @@ class MeteorPatternManager {
 
   createPlacements(width, pattern, count, settings) {
     if (pattern === "group") return this.group(width, count);
-    if (pattern === "diagonalRain") return this.diagonalRain(count);
+    if (pattern === "diagonalRain") return this.diagonalRain(width, count);
     if (pattern === "wave") return this.wave(width, count);
     if (pattern === "mixed") return this.mixed(width, count, settings);
     return this.verticalRain(width, count);
@@ -79,11 +79,12 @@ class MeteorPatternManager {
     }));
   }
 
-  diagonalRain(count) {
+  diagonalRain(width, count) {
+    const spacing = 1 / Math.max(1, count);
     return Array.from({ length: count }, (_, index) => ({
       pattern: "diagonalRain",
       direction: "diagonalRight",
-      edgeBias: Math.random() * 0.34,
+      xRatio: Math.min(0.96, Math.max(0.04, index * spacing + spacing * (0.25 + Math.random() * 0.5))),
       angle: 20 + Math.random() * 25,
       yOffset: index * 34,
     }));
@@ -331,12 +332,12 @@ class DifficultyManager {
     const reducedTarget = this.cloneSettings(target);
     reducedTarget.phaseName = target.phaseName;
     reducedTarget.forceDiagonalOnly = target.forceDiagonalOnly;
-    reducedTarget.spawnInterval = Math.max(this.minSpawnInterval, target.spawnInterval * 1.2);
-    reducedTarget.speedMin = Math.max(1, target.speedMin * 0.8);
-    reducedTarget.speedMax = Math.max(reducedTarget.speedMin, target.speedMax * 0.8);
-    reducedTarget.minActive = Math.max(1, target.minActive * 0.8);
-    reducedTarget.maxActive = Math.max(reducedTarget.minActive + 1, target.maxActive * 0.8);
-    reducedTarget.maxBatch = Math.max(1, target.maxBatch * 0.8);
+    reducedTarget.spawnInterval = Math.max(this.minSpawnInterval, target.spawnInterval * 1.38);
+    reducedTarget.speedMin = Math.max(1, target.speedMin * 0.68);
+    reducedTarget.speedMax = Math.max(reducedTarget.speedMin, target.speedMax * 0.68);
+    reducedTarget.minActive = Math.max(1, target.minActive * 0.68);
+    reducedTarget.maxActive = Math.max(reducedTarget.minActive + 1, target.maxActive * 0.68);
+    reducedTarget.maxBatch = Math.max(1, target.maxBatch * 0.68);
     return reducedTarget;
   }
 
@@ -396,7 +397,7 @@ class DifficultyManager {
   getNextSpawnDelay() {
     if (this.firstDelayPending) {
       this.firstDelayPending = false;
-      return 0.29;
+      return 0.33;
     }
     return Math.max(this.minSpawnInterval, this.current.spawnInterval);
   }
@@ -438,9 +439,12 @@ class DifficultyManager {
       const angle = (placement.angle || (20 + Math.random() * 25)) * (Math.PI / 180);
       const side = direction === "diagonalRight" ? "left" : "right";
       const edgeRange = width * (0.14 + Math.random() * 0.22);
-      const x = side === "left"
-        ? -radius - 16 + (placement.edgeBias || Math.random()) * edgeRange
-        : width + radius + 16 - (placement.edgeBias || Math.random()) * edgeRange;
+      const hasScreenLane = Number.isFinite(placement.xRatio) || (Number.isFinite(placement.lane) && placement.laneCount > 1);
+      const x = hasScreenLane
+        ? this.xForPlacement(width, radius, placement)
+        : side === "left"
+          ? -radius - 16 + (placement.edgeBias || Math.random()) * edgeRange
+          : width + radius + 16 - (placement.edgeBias || Math.random()) * edgeRange;
       const vx = Math.tan(angle) * speed * (side === "left" ? 1 : -1);
       return { x, vx, direction };
     }

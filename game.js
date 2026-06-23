@@ -220,8 +220,8 @@ class Player {
     this.x = game.width / 2;
     this.y = game.height - 96;
     this.vx = 0;
-    this.maxSpeed = 936;
-    this.minMoveSpeed = 228;
+    this.maxSpeed = 1030;
+    this.minMoveSpeed = 251;
     this.acceleration = (this.maxSpeed - this.minMoveSpeed) / 2;
     this.brakeAcceleration = this.maxSpeed / 0.18;
     this.turnAcceleration = this.maxSpeed / 0.12;
@@ -1442,10 +1442,7 @@ class Game {
     this.audio.stopMusic();
     this.explode(this.player.x, this.player.y);
     this.shake = 0.45;
-    if (this.score > this.best) {
-      this.best = this.score;
-      localStorage.setItem("dtm_bestScore", String(this.best));
-    }
+    this.syncBestScore();
     setTimeout(() => {
       this.ui.finalScore.textContent = this.score;
       this.ui.finalBest.textContent = this.best;
@@ -1460,6 +1457,18 @@ class Game {
   syncBest() {
     this.ui.menuBest.textContent = this.best;
     this.ui.best.textContent = this.best;
+  }
+
+  addScore(points) {
+    this.score += points;
+    this.syncBestScore();
+  }
+
+  syncBestScore() {
+    if (this.score <= this.best) return;
+    this.best = this.score;
+    localStorage.setItem("dtm_bestScore", String(this.best));
+    this.syncBest();
   }
 
   syncMute() {
@@ -1499,7 +1508,7 @@ class Game {
     this.scoreRemainder += dt * 10;
     if (this.scoreRemainder >= 1) {
       const gain = Math.floor(this.scoreRemainder);
-      this.score += gain;
+      this.addScore(gain);
       this.scoreRemainder -= gain;
     }
 
@@ -1598,7 +1607,7 @@ class Game {
         this.combo = Math.min(9, this.combo + 1);
         this.comboTimer = 3.2;
         const bonus = 10 * this.combo;
-        this.score += bonus;
+        this.addScore(bonus);
         this.texts.push(new FloatingText(`Near Miss +${bonus}`, meteor.x, meteor.y, "#ffe45c"));
         this.audio.nearMiss();
       }
@@ -1613,7 +1622,7 @@ class Game {
           this.slowTimer = 5;
           this.texts.push(new FloatingText("Slow Time", power.x, power.y, "#d8b4fe"));
         }
-        this.score += 15;
+        this.addScore(15);
         this.explode(power.x, power.y, power.type === "shield" ? "#31d7ff" : "#a855f7", 12);
         power.y = this.height + 80;
         this.audio.power();
@@ -1637,7 +1646,7 @@ class Game {
 
   updateHud() {
     this.ui.score.textContent = this.score;
-    this.ui.best.textContent = Math.max(this.best, this.score);
+    this.ui.best.textContent = this.best;
     const seconds = Math.floor(this.elapsed);
     this.ui.time.textContent = `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
     this.ui.combo.textContent = `x${this.combo}`;
